@@ -34,7 +34,7 @@ export default function ReservationsScreen() {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const handleDelete = (r: Reservation) => {
-    Alert.alert('Eliminar reservación', `¿Eliminar la reservación #${r.id}?`, [
+    Alert.alert('Eliminar pedido', `¿Eliminar el pedido #${r.id}?`, [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Eliminar', style: 'destructive', onPress: async () => { await reservationsRepository.delete(r.id); load(); } },
     ]);
@@ -72,8 +72,8 @@ export default function ReservationsScreen() {
           <Ionicons name="arrow-back" size={20} color={COLORS.text.primary} />
         </TouchableOpacity>
         <View style={s.headerInfo}>
-          <Text style={s.title}>Reservaciones</Text>
-          <Text style={s.subtitle}>{reservations.length} reservas registradas</Text>
+          <Text style={s.title}>Pedidios</Text>
+          <Text style={s.subtitle}>{reservations.length} pedidios registrados</Text>
         </View>
         <TouchableOpacity
           style={s.addBtn}
@@ -92,11 +92,11 @@ export default function ReservationsScreen() {
           <View style={s.emptyIcon}>
             <Ionicons name="calendar-outline" size={48} color={COLORS.accent.primary} />
           </View>
-          <Text style={s.emptyTitle}>Sin reservaciones</Text>
-          <Text style={s.emptyText}>Añade la primera reservación tocando el botón +</Text>
+          <Text style={s.emptyTitle}>Sin pedidos</Text>
+          <Text style={s.emptyText}>Añade el primer pedido tocando el botón +</Text>
           <TouchableOpacity style={s.emptyBtn} onPress={() => router.push('/reservations/add' as any)}>
             <Ionicons name="add" size={18} color="#fff" />
-            <Text style={s.emptyBtnText}>Nueva reservación</Text>
+            <Text style={s.emptyBtnText}>Nuevo pedido</Text>
           </TouchableOpacity>
         </View>
       ) : (

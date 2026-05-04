@@ -1,11 +1,11 @@
-export type TransportType = 'omnibus' | 'tren' | 'catamaran' | 'avion';
+import { TransportType } from '../types';
 
 // Todas las provincias
 export const ALL_PROVINCES = [
   'Pinar del Río (Autopista)',
   'Pinar del Río (Carretera Central)',
-  'Artemisa',
   'La Habana',
+  'Artemisa',
   'San José de las Lajas',
   'Matanzas',
   'Cienfuegos',

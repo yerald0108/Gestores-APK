@@ -308,12 +308,14 @@ export default function AddReservationScreen() {
         const db = await getDatabase();
         await db.runAsync(
           `UPDATE reservations SET phone=?, transport=?, origin=?, destination=?,
-           route_price=?, travel_date=?, reservation_date=?, advance=?, total=?, updated_at=?
-           WHERE id=?`,
+          route_price=?, travel_date=?, reservation_date=?, advance=?, total=?,
+          status=?, updated_at=?
+          WHERE id=?`,
           [phone.trim(), transport, origin, destination, routePrice,
-           travelISO, reservationISO, advanceNum, total,
-           isReserved ? 'Reservado' : 'Pendiente',
-           new Date().toISOString(), Number(editId)]
+          travelISO, reservationISO, advanceNum, total,
+          isReserved ? 'Reservado' : 'Pendiente',
+          new Date().toISOString(),
+          Number(editId)]
         );
         await db.runAsync('DELETE FROM passengers WHERE reservation_id = ?', [Number(editId)]);
         for (const p of passengers) {
@@ -339,7 +341,7 @@ export default function AddReservationScreen() {
       router.back();
     } catch (e) {
       console.error(e);
-      Alert.alert('Error', 'No se pudo guardar la reservación');
+      Alert.alert('Error', 'No se pudo guardar el pedido');
     } finally {
       setLoading(false);
     }
@@ -358,7 +360,7 @@ export default function AddReservationScreen() {
             <Ionicons name="arrow-back" size={20} color={COLORS.text.primary} />
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
-            <Text style={s.title}>{isEditing ? 'Editar Reservación' : 'Nueva Reservación'}</Text>
+            <Text style={s.title}>{isEditing ? 'Editar Pedido' : 'Nuevo Peidido'}</Text>
             <Text style={s.subtitle}>{isEditing ? 'Modifica los datos de la reserva' : 'Completa todos los datos del cliente'}</Text>
           </View>
         </View>
@@ -481,25 +483,6 @@ export default function AddReservationScreen() {
           <SectionHeader icon="calendar" label="Fechas" color={accentColor} />
 
           <View style={s.fieldGroup}>
-            <Text style={s.label}>Fecha de viaje</Text>
-            <TouchableOpacity
-              style={[s.selector, errors.travelDate ? s.inputError : null]}
-              onPress={() => setShowTravelPicker(true)}
-            >
-              <View style={[s.inputIcon, { backgroundColor: accentColor + '1A' }]}>
-                <Ionicons name="airplane" size={16} color={accentColor} />
-              </View>
-              <Text style={[s.selText, !travelDate && s.placeholder]}>
-                {travelDate ? formatDateDisplay(travelDate) : 'Selecciona la fecha de viaje'}
-              </Text>
-              {travelDate
-                ? <Ionicons name="checkmark-circle" size={18} color={COLORS.accent.success} />
-                : <Ionicons name="calendar-outline" size={18} color={COLORS.text.muted} />}
-            </TouchableOpacity>
-            {errors.travelDate ? <Text style={s.error}>{errors.travelDate}</Text> : null}
-          </View>
-
-          <View style={s.fieldGroup}>
             <Text style={s.label}>Fecha de reserva</Text>
             <TouchableOpacity
               style={[s.selector, errors.reservationDate ? s.inputError : null]}
@@ -516,6 +499,25 @@ export default function AddReservationScreen() {
                 : <Ionicons name="calendar-outline" size={18} color={COLORS.text.muted} />}
             </TouchableOpacity>
             {errors.reservationDate ? <Text style={s.error}>{errors.reservationDate}</Text> : null}
+          </View>
+
+          <View style={s.fieldGroup}>
+            <Text style={s.label}>Fecha de viaje</Text>
+            <TouchableOpacity
+              style={[s.selector, errors.travelDate ? s.inputError : null]}
+              onPress={() => setShowTravelPicker(true)}
+            >
+              <View style={[s.inputIcon, { backgroundColor: accentColor + '1A' }]}>
+                <Ionicons name="calendar" size={16} color={accentColor} />
+              </View>
+              <Text style={[s.selText, !travelDate && s.placeholder]}>
+                {travelDate ? formatDateDisplay(travelDate) : 'Selecciona la fecha de viaje'}
+              </Text>
+              {travelDate
+                ? <Ionicons name="checkmark-circle" size={18} color={COLORS.accent.success} />
+                : <Ionicons name="calendar-outline" size={18} color={COLORS.text.muted} />}
+            </TouchableOpacity>
+            {errors.travelDate ? <Text style={s.error}>{errors.travelDate}</Text> : null}
           </View>
 
           {/* ── Pasajeros ── */}
@@ -649,7 +651,7 @@ export default function AddReservationScreen() {
             {loading ? <ActivityIndicator color="#fff" /> : (
               <>
                 <Ionicons name="checkmark" size={20} color="#fff" />
-                <Text style={s.saveBtnText}>{isEditing ? 'Guardar cambios' : 'Guardar reservación'}</Text>
+                <Text style={s.saveBtnText}>{isEditing ? 'Guardar cambios' : 'Guardar pedido'}</Text>
               </>
             )}
           </TouchableOpacity>

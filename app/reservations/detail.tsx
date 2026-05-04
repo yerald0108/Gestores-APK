@@ -66,7 +66,7 @@ export default function ReservationDetailScreen() {
   };
 
   const handleDelete = () => {
-    Alert.alert('Eliminar', '¿Eliminar esta reservación?', [
+    Alert.alert('Eliminar', '¿Eliminar este pedido?', [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Eliminar', style: 'destructive', onPress: async () => { await reservationsRepository.delete(reservation.id); router.back(); } },
     ]);
@@ -79,7 +79,7 @@ export default function ReservationDetailScreen() {
         <TouchableOpacity style={d.backBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={20} color={COLORS.text.primary} />
         </TouchableOpacity>
-        <Text style={d.title}>Reservación #{reservation.id}</Text>
+        <Text style={d.title}>Pedido #{reservation.id}</Text>
         <TouchableOpacity style={d.deleteBtn} onPress={handleDelete}>
           <Ionicons name="trash-outline" size={18} color={COLORS.accent.danger} />
         </TouchableOpacity>

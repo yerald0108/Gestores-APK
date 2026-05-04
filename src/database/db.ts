@@ -54,4 +54,18 @@ const initializeDatabase = async (database: SQLite.SQLiteDatabase): Promise<void
     CREATE INDEX IF NOT EXISTS idx_reservations_status ON reservations(status);
     CREATE INDEX IF NOT EXISTS idx_passengers_reservation ON passengers(reservation_id);
   `);
+
+  // Migraciones — se ejecutan por separado con try/catch individual
+  await runMigrations(database);
+};
+
+const runMigrations = async (database: SQLite.SQLiteDatabase): Promise<void> => {
+  // Migración 1: añadir app_price a routes si no existe
+  try {
+    await database.execAsync(
+      `ALTER TABLE routes ADD COLUMN app_price REAL NOT NULL DEFAULT 0;`
+    );
+  } catch (_) {
+    // Columna ya existe, ignorar
+  }
 };
