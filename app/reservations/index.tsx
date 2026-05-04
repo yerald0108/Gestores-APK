@@ -1,0 +1,292 @@
+import React, { useState, useCallback } from 'react';
+import {
+  View, Text, StyleSheet, TouchableOpacity, FlatList,
+  ActivityIndicator, Alert, Linking
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { router, useFocusEffect } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { COLORS, SPACING, FONT, RADIUS, TRANSPORT_CONFIG } from '@/constants/theme';
+import { reservationsRepository } from '@/database/reservationsRepository';
+import { Reservation } from '@/types';
+
+function formatDate(dateStr: string) {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+export default function ReservationsScreen() {
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await reservationsRepository.getAll();
+      setReservations(data);
+    } catch {
+      Alert.alert('Error', 'No se pudieron cargar las reservaciones');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const handleDelete = (r: Reservation) => {
+    Alert.alert('Eliminar reservación', `¿Eliminar la reservación #${r.id}?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Eliminar', style: 'destructive', onPress: async () => { await reservationsRepository.delete(r.id); load(); } },
+    ]);
+  };
+
+  const handleWhatsApp = (item: Reservation) => {
+    const tc = TRANSPORT_CONFIG[item.transport];
+    const passengerList = (item.passengers ?? []).map((p, i) =>
+      `  ${i + 1}. ${p.full_name} (CI: ${p.identity_card})`
+    ).join('\n');
+    const msg = [
+      `🧳 *Reservación #${item.id} — Viajando*`,
+      ``,
+      `🚌 *Transporte:* ${tc.label}`,
+      `📍 *Ruta:* ${item.origin} → ${item.destination}`,
+      `📅 *Fecha de viaje:* ${new Date(item.travel_date).toLocaleDateString('es-ES')}`,
+      ``,
+      `👥 *Pasajeros (${item.passengers?.length ?? 0}):*`,
+      passengerList,
+      ``,
+      `💰 *Precio/pasajero:* ${item.route_price.toFixed(2)} CUP`,
+      item.advance > 0 ? `✅ *Anticipo:* ${item.advance.toFixed(2)} CUP` : '',
+      `💳 *Total a pagar:* ${item.total.toFixed(2)} CUP`,
+    ].filter(Boolean).join('\n');
+    const clean = item.phone.replace(/\D/g, '');
+    Linking.openURL(`whatsapp://send?phone=53${clean}&text=${encodeURIComponent(msg)}`)
+      .catch(() => Alert.alert('WhatsApp no disponible'));
+  };
+
+  return (
+    <SafeAreaView style={s.container}>
+      {/* Header */}
+      <View style={s.header}>
+        <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={20} color={COLORS.text.primary} />
+        </TouchableOpacity>
+        <View style={s.headerInfo}>
+          <Text style={s.title}>Reservaciones</Text>
+          <Text style={s.subtitle}>{reservations.length} reservas registradas</Text>
+        </View>
+        <TouchableOpacity
+          style={s.addBtn}
+          onPress={() => router.push('/reservations/add' as any)}
+        >
+          <Ionicons name="add" size={22} color="#fff" />
+        </TouchableOpacity>
+      </View>
+
+      {loading ? (
+        <View style={s.centered}>
+          <ActivityIndicator color={COLORS.accent.primary} size="large" />
+        </View>
+      ) : reservations.length === 0 ? (
+        <View style={s.centered}>
+          <View style={s.emptyIcon}>
+            <Ionicons name="calendar-outline" size={48} color={COLORS.accent.primary} />
+          </View>
+          <Text style={s.emptyTitle}>Sin reservaciones</Text>
+          <Text style={s.emptyText}>Añade la primera reservación tocando el botón +</Text>
+          <TouchableOpacity style={s.emptyBtn} onPress={() => router.push('/reservations/add' as any)}>
+            <Ionicons name="add" size={18} color="#fff" />
+            <Text style={s.emptyBtnText}>Nueva reservación</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <FlatList
+          data={reservations}
+          keyExtractor={(item) => item.id.toString()}
+          contentContainerStyle={s.list}
+          showsVerticalScrollIndicator={false}
+          renderItem={({ item }) => {
+            const tc = TRANSPORT_CONFIG[item.transport];
+            const passengerCount = item.passengers?.length ?? 0;
+            return (
+              <TouchableOpacity
+                style={s.card}
+                onPress={() => router.push({ pathname: '/reservations/detail', params: { id: item.id.toString() } } as any)}
+                activeOpacity={0.75}
+              >
+                {/* Top row */}
+                <View style={s.cardTop}>
+                  <View style={[s.transportBadge, { backgroundColor: tc.color + '1A' }]}>
+                    <Ionicons name={tc.icon as any} size={14} color={tc.color} />
+                    <Text style={[s.transportLabel, { color: tc.color }]}>{tc.label}</Text>
+                  </View>
+                  <View style={[
+                    s.statusBadge,
+                    { backgroundColor: item.status === 'Reservado' ? COLORS.accent.success + '1A' : COLORS.accent.warning + '1A' }
+                  ]}>
+                    <View style={[
+                    s.statusDot,
+                    { backgroundColor: item.status === 'Reservado' ? COLORS.accent.success : COLORS.accent.warning }
+                  ]} />
+                    <Text style={[
+                      s.statusText,
+                      { color: item.status === 'Reservado' ? COLORS.accent.success : COLORS.accent.warning }
+                  ]}>
+                      {item.status}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Route */}
+                <View style={s.routeRow}>
+                  <Text style={s.cityText}>{item.origin}</Text>
+                  <View style={s.routeArrow}>
+                    <View style={[s.routeLine, { backgroundColor: tc.color + '44' }]} />
+                    <Ionicons name="airplane" size={12} color={tc.color} />
+                    <View style={[s.routeLine, { backgroundColor: tc.color + '44' }]} />
+                  </View>
+                  <Text style={s.cityText}>{item.destination}</Text>
+                </View>
+
+                {/* Info row */}
+                <View style={s.infoRow}>
+                  <View style={s.infoItem}>
+                    <Ionicons name="people-outline" size={13} color={COLORS.text.muted} />
+                    <Text style={s.infoText}>{passengerCount} pasajero{passengerCount !== 1 ? 's' : ''}</Text>
+                  </View>
+                  <View style={s.infoItem}>
+                    <Ionicons name="calendar-outline" size={13} color={COLORS.text.muted} />
+                    <Text style={s.infoText}>{formatDate(item.travel_date)}</Text>
+                  </View>
+                  <View style={s.infoItem}>
+                    <Ionicons name="call-outline" size={13} color={COLORS.text.muted} />
+                    <Text style={s.infoText}>{item.phone}</Text>
+                  </View>
+                </View>
+
+                {/* Bottom - Actions reorganizados */}
+                <View style={s.cardBottom}>
+                  <View style={s.totalSection}>
+                    <Text style={s.totalLabel}>Total a pagar</Text>
+                    <Text style={[s.totalAmount, { color: COLORS.accent.success }]}>
+                      {item.total.toFixed(2)} CUP
+                    </Text>
+                  </View>
+                  
+                  <View style={s.actionsGroup}>
+                    <TouchableOpacity
+                      style={s.actionBtn}
+                      onPress={() => router.push({
+                        pathname: '/reservations/add',
+                        params: { editId: item.id.toString() }
+                      } as any)}
+                    >
+                      <Ionicons name="pencil" size={16} color={COLORS.accent.primary} />
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity
+                      style={[s.actionBtn, s.whatsappBtn]}
+                      onPress={() => handleWhatsApp(item)}
+                    >
+                      <Ionicons name="logo-whatsapp" size={18} color="#25D366" />
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity
+                      style={[s.actionBtn, s.deleteBtn]}
+                      onPress={() => handleDelete(item)}
+                    >
+                      <Ionicons name="trash-outline" size={16} color={COLORS.accent.danger} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            );
+          }}
+        />
+      )}
+    </SafeAreaView>
+  );
+}
+
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: COLORS.bg.primary },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingTop: SPACING.md, paddingBottom: SPACING.lg, gap: SPACING.sm },
+  backBtn: { width: 40, height: 40, borderRadius: RADIUS.full, backgroundColor: COLORS.bg.card, borderWidth: 1, borderColor: COLORS.border.default, justifyContent: 'center', alignItems: 'center' },
+  headerInfo: { flex: 1 },
+  title: { fontSize: FONT.sizes.xl, color: COLORS.text.primary, fontWeight: FONT.weights.bold },
+  subtitle: { fontSize: FONT.sizes.xs, color: COLORS.text.muted, marginTop: 2 },
+  addBtn: { width: 44, height: 44, borderRadius: RADIUS.full, backgroundColor: COLORS.accent.primary, justifyContent: 'center', alignItems: 'center' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: SPACING.md, padding: SPACING.xl },
+  emptyIcon: { width: 96, height: 96, borderRadius: RADIUS.xl, backgroundColor: COLORS.accent.primary + '1A', justifyContent: 'center', alignItems: 'center' },
+  emptyTitle: { fontSize: FONT.sizes.xl, color: COLORS.text.primary, fontWeight: FONT.weights.bold },
+  emptyText: { fontSize: FONT.sizes.md, color: COLORS.text.secondary, textAlign: 'center', lineHeight: 22 },
+  emptyBtn: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs, paddingHorizontal: SPACING.lg, paddingVertical: SPACING.sm + 2, borderRadius: RADIUS.full, backgroundColor: COLORS.accent.primary, marginTop: SPACING.sm },
+  emptyBtnText: { color: '#fff', fontWeight: FONT.weights.semibold, fontSize: FONT.sizes.md },
+  list: { padding: SPACING.lg, gap: SPACING.md },
+  card: { backgroundColor: COLORS.bg.card, borderRadius: RADIUS.xl, padding: SPACING.lg, borderWidth: 1, borderColor: COLORS.border.default, gap: SPACING.md },
+  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  transportBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: SPACING.sm, paddingVertical: 4, borderRadius: RADIUS.full },
+  transportLabel: { fontSize: FONT.sizes.xs, fontWeight: FONT.weights.semibold },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: SPACING.sm, paddingVertical: 4, borderRadius: RADIUS.full, backgroundColor: COLORS.accent.warning + '1A' },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  statusText: { fontSize: FONT.sizes.xs, color: COLORS.accent.warning, fontWeight: FONT.weights.medium },
+  routeRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
+  cityText: { fontSize: FONT.sizes.md, color: COLORS.text.primary, fontWeight: FONT.weights.bold, flex: 1 },
+  routeArrow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  routeLine: { width: 20, height: 1 },
+  infoRow: { flexDirection: 'row', gap: SPACING.md },
+  infoItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  infoText: { fontSize: FONT.sizes.xs, color: COLORS.text.muted },
+  
+  // Bottom section reorganizado
+  cardBottom: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: SPACING.sm,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border.default,
+  },
+  totalSection: {
+    flex: 1,
+  },
+  totalLabel: {
+    fontSize: FONT.sizes.xs,
+    color: COLORS.text.muted,
+  },
+  totalAmount: {
+    fontSize: FONT.sizes.lg,
+    fontWeight: FONT.weights.extrabold,
+  },
+  
+  // Grupo de acciones
+  actionsGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  
+  // Botón de acción base
+  actionBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.accent.primary + '1A',
+    borderWidth: 1,
+    borderColor: COLORS.accent.primary + '55',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  // Botón de WhatsApp
+  whatsappBtn: {
+    backgroundColor: '#25D36622',
+    borderColor: '#25D36655',
+  },
+  
+  // Botón de eliminar
+  deleteBtn: {
+    backgroundColor: COLORS.accent.danger + '1A',
+    borderColor: COLORS.accent.danger + '55',
+  },
+});
