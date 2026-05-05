@@ -182,6 +182,10 @@ export default function AddReservationScreen() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isReserved, setIsReserved] = useState(false);
 
+  // ── Campos de gestor ──
+  const [isGestor, setIsGestor] = useState<boolean | null>(null); // null = sin responder
+  const [gestorCost, setGestorCost] = useState(''); // monto por pasajero al gestor
+
   const [routes, setRoutes] = useState<Route[]>([]);
   const [availableRoutes, setAvailableRoutes] = useState<Route[]>([]);
   const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
@@ -192,12 +196,10 @@ export default function AddReservationScreen() {
   const [showTravelPicker, setShowTravelPicker] = useState(false);
   const [showReservationPicker, setShowReservationPicker] = useState(false);
 
-  // Cargar rutas
   useEffect(() => {
     routesRepository.getAll().then(setRoutes);
   }, []);
 
-  // Cargar datos al editar
   useEffect(() => {
     if (isEditing) {
       reservationsRepository.getById(Number(editId)).then((r) => {
@@ -213,12 +215,18 @@ export default function AddReservationScreen() {
           setAdvanceEnabled(true);
           setAdvance(r.advance.toString());
         }
-        setIsReserved(r.status === 'Reservado');
+        const wasReserved = r.status === 'Reservado';
+        setIsReserved(wasReserved);
+        if (wasReserved) {
+          setIsGestor(r.is_gestor === 1);
+          if (r.is_gestor === 1) {
+            setGestorCost(r.gestor_cost_per_passenger.toString());
+          }
+        }
       });
     }
   }, [editId]);
 
-  // Filtrar rutas por transporte
   useEffect(() => {
     if (transport) {
       const filtered = routes.filter((r) => r.transport === transport);
@@ -231,7 +239,6 @@ export default function AddReservationScreen() {
     }
   }, [transport, routes]);
 
-  // Buscar ruta seleccionada (origen→destino O destino→origen por mismo precio)
   useEffect(() => {
     if (origin && destination && transport) {
       const route =
@@ -243,6 +250,15 @@ export default function AddReservationScreen() {
     }
   }, [origin, destination, transport, routes]);
 
+  // Cuando se desactiva "Reservado", limpiamos estado gestor
+  const handleToggleReserved = (newVal: boolean) => {
+    setIsReserved(newVal);
+    if (!newVal) {
+      setIsGestor(null);
+      setGestorCost('');
+    }
+  };
+
   const availableOrigins = [...new Set(availableRoutes.map((r) => r.origin).concat(availableRoutes.map((r) => r.destination)))];
   const availableDestinations = [...new Set(
     availableRoutes
@@ -251,12 +267,18 @@ export default function AddReservationScreen() {
   )];
 
   const routePrice = selectedRoute?.price ?? 0;
+  const appPrice = selectedRoute?.app_price ?? 0;
   const passengerCount = passengers.length;
   const advanceNum = advanceEnabled ? (parseFloat(advance) || 0) : 0;
   const subtotal = routePrice * passengerCount;
   const total = Math.max(0, subtotal - advanceNum);
 
-  // Intercambiar origen y destino
+  // Cálculo de ganancia preview (solo cuando está reservado)
+  const gestorCostNum = parseFloat(gestorCost) || 0;
+  const costPerPassenger = isGestor ? gestorCostNum : appPrice;
+  const totalCost = costPerPassenger * passengerCount;
+  const gananciaPreview = subtotal - totalCost;
+
   const swapOriginDestination = () => {
     const temp = origin;
     setOrigin(destination);
@@ -290,30 +312,40 @@ export default function AddReservationScreen() {
       if (!p.full_name.trim()) e[`p_name_${i}`] = 'Nombre requerido';
       if (p.identity_card.length !== 11) e[`p_ci_${i}`] = 'CI debe tener 11 dígitos';
     });
+    // Validar gestor si está marcado como reservado
+    if (isReserved) {
+      if (isGestor === null) e.gestor = 'Indica si fue comprado por un gestor';
+      if (isGestor === true && gestorCostNum <= 0) e.gestorCost = 'Ingresa el costo del gestor por pasajero';
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
   const handleSave = async () => {
     if (!validate()) {
-      Alert.alert('Datos incompletos', 'Por favor revisa los campos marcados en rojo.');
+      Alert.alert('Datos incompletos', 'Por favor revisa los campos marcados.');
       return;
     }
     setLoading(true);
     try {
       const travelISO = formatDateISO(travelDate!);
       const reservationISO = formatDateISO(reservationDate!);
+      const finalIsGestor = isReserved ? (isGestor ? 1 : 0) : 0;
+      const finalGestorCost = isReserved && isGestor ? gestorCostNum : 0;
+      const finalAppCost = appPrice; // siempre guardamos el app_price snapshot
 
       if (isEditing) {
         const db = await getDatabase();
         await db.runAsync(
           `UPDATE reservations SET phone=?, transport=?, origin=?, destination=?,
           route_price=?, travel_date=?, reservation_date=?, advance=?, total=?,
-          status=?, updated_at=?
+          status=?, is_gestor=?, gestor_cost_per_passenger=?, app_cost_per_passenger=?,
+          updated_at=?
           WHERE id=?`,
           [phone.trim(), transport, origin, destination, routePrice,
           travelISO, reservationISO, advanceNum, total,
           isReserved ? 'Reservado' : 'Pendiente',
+          finalIsGestor, finalGestorCost, finalAppCost,
           new Date().toISOString(),
           Number(editId)]
         );
@@ -334,7 +366,10 @@ export default function AddReservationScreen() {
           reservation_date: reservationISO,
           advance: advanceNum,
           total,
-          status: 'Pendiente',
+          status: isReserved ? 'Reservado' : 'Pendiente',
+          is_gestor: finalIsGestor,
+          gestor_cost_per_passenger: finalGestorCost,
+          app_cost_per_passenger: finalAppCost,
           passengers,
         });
       }
@@ -349,7 +384,6 @@ export default function AddReservationScreen() {
 
   const tc = transport ? TRANSPORT_CONFIG[transport as TransportType] : null;
   const accentColor = tc?.color ?? COLORS.accent.primary;
-  const provinces = getProvincesForTransport(transport);
 
   return (
     <SafeAreaView style={s.container}>
@@ -360,14 +394,12 @@ export default function AddReservationScreen() {
             <Ionicons name="arrow-back" size={20} color={COLORS.text.primary} />
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
-            <Text style={s.title}>{isEditing ? 'Editar Pedido' : 'Nuevo Peidido'}</Text>
+            <Text style={s.title}>{isEditing ? 'Editar Pedido' : 'Nuevo Pedido'}</Text>
             <Text style={s.subtitle}>{isEditing ? 'Modifica los datos de la reserva' : 'Completa todos los datos del cliente'}</Text>
           </View>
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.content}>
-
-
 
           {/* ── Contacto ── */}
           <SectionHeader icon="call" label="Contacto" color={accentColor} />
@@ -413,14 +445,13 @@ export default function AddReservationScreen() {
 
           {transport !== '' && (
             <>
-              {/* Origen */}
               <View style={s.fieldGroup}>
                 <Text style={s.label}>Origen</Text>
                 <TouchableOpacity
                   style={[s.selector, errors.origin ? s.inputError : null]}
                   onPress={() => availableOrigins.length > 0
                     ? setShowOriginModal(true)
-                    : Alert.alert('Sin rutas', `No hay rutas de ${tc?.label} registradas. Añádelas primero en Rutas y Precios.`)}
+                    : Alert.alert('Sin rutas', `No hay rutas de ${tc?.label} registradas.`)}
                 >
                   <View style={[s.inputIcon, { backgroundColor: accentColor + '1A' }]}>
                     <Ionicons name="location" size={16} color={accentColor} />
@@ -433,7 +464,6 @@ export default function AddReservationScreen() {
                 {errors.origin ? <Text style={s.error}>{errors.origin}</Text> : null}
               </View>
 
-              {/* Botón intercambiar */}
               <View style={s.swapRow}>
                 <View style={[s.swapLine, { backgroundColor: accentColor + '33' }]} />
                 <TouchableOpacity
@@ -446,7 +476,6 @@ export default function AddReservationScreen() {
                 <View style={[s.swapLine, { backgroundColor: accentColor + '33' }]} />
               </View>
 
-              {/* Destino */}
               <View style={s.fieldGroup}>
                 <Text style={s.label}>Destino</Text>
                 <TouchableOpacity
@@ -466,7 +495,6 @@ export default function AddReservationScreen() {
                 {errors.destination ? <Text style={s.error}>{errors.destination}</Text> : null}
               </View>
 
-              {/* Precio encontrado */}
               {selectedRoute && (
                 <View style={[s.routePriceCard, { borderColor: accentColor + '44', backgroundColor: accentColor + '0D' }]}>
                   <Ionicons name="checkmark-circle" size={18} color={accentColor} />
@@ -535,7 +563,7 @@ export default function AddReservationScreen() {
             <Text style={[s.addPassText, { color: accentColor }]}>Añadir otro pasajero</Text>
           </TouchableOpacity>
 
-          {/* ── Estado de reserva (solo al editar) ── */}
+          {/* ── Estado de reserva ── */}
           {isEditing && (
             <>
               <SectionHeader icon="checkmark-circle" label="Estado" color={accentColor} />
@@ -547,7 +575,7 @@ export default function AddReservationScreen() {
                     backgroundColor: isReserved ? COLORS.accent.success + '0D' : COLORS.bg.input,
                   }
                 ]}
-                onPress={() => setIsReserved(!isReserved)}
+                onPress={() => handleToggleReserved(!isReserved)}
                 activeOpacity={0.7}
               >
                 <View style={[s.inputIcon, { backgroundColor: isReserved ? COLORS.accent.success + '22' : COLORS.bg.elevated }]}>
@@ -562,20 +590,130 @@ export default function AddReservationScreen() {
                     {isReserved ? 'Reservado' : 'Pedido pendiente'}
                   </Text>
                   <Text style={s.toggleHint}>
-                    {isReserved ? 'Este pedido pasó a ser una reserva' : 'Toca para marcar como reservado'}
+                    {isReserved ? 'Este pedido pasará a ser una reserva' : 'Toca para marcar como reservado'}
                   </Text>
                 </View>
                 <View style={[s.toggle, { backgroundColor: isReserved ? COLORS.accent.success : COLORS.bg.elevated }]}>
                   <View style={[s.toggleThumb, { transform: [{ translateX: isReserved ? 18 : 2 }] }]} />
                 </View>
               </TouchableOpacity>
+
+              {/* ── Bloque gestor (aparece cuando isReserved = true) ── */}
+              {isReserved && (
+                <View style={s.gestorBlock}>
+                  {/* Encabezado */}
+                  <View style={s.gestorHeader}>
+                    <View style={[s.gestorIconWrap, { backgroundColor: COLORS.accent.warning + '1A' }]}>
+                      <Ionicons name="person-circle-outline" size={16} color={COLORS.accent.warning} />
+                    </View>
+                    <Text style={s.gestorTitle}>¿Comprado por un gestor?</Text>
+                  </View>
+                  {errors.gestor ? <Text style={s.error}>{errors.gestor}</Text> : null}
+
+                  {/* Botones Sí / No */}
+                  <View style={s.gestorBtnRow}>
+                    <TouchableOpacity
+                      style={[
+                        s.gestorBtn,
+                        isGestor === true && { backgroundColor: COLORS.accent.warning + '22', borderColor: COLORS.accent.warning },
+                      ]}
+                      onPress={() => { setIsGestor(true); setErrors(e => ({ ...e, gestor: '' })); }}
+                    >
+                      <Ionicons
+                        name={isGestor === true ? 'checkmark-circle' : 'ellipse-outline'}
+                        size={18}
+                        color={isGestor === true ? COLORS.accent.warning : COLORS.text.muted}
+                      />
+                      <Text style={[s.gestorBtnText, isGestor === true && { color: COLORS.accent.warning }]}>
+                        Sí, por gestor
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[
+                        s.gestorBtn,
+                        isGestor === false && { backgroundColor: COLORS.accent.primary + '22', borderColor: COLORS.accent.primary },
+                      ]}
+                      onPress={() => { setIsGestor(false); setGestorCost(''); setErrors(e => ({ ...e, gestor: '', gestorCost: '' })); }}
+                    >
+                      <Ionicons
+                        name={isGestor === false ? 'checkmark-circle' : 'ellipse-outline'}
+                        size={18}
+                        color={isGestor === false ? COLORS.accent.primary : COLORS.text.muted}
+                      />
+                      <Text style={[s.gestorBtnText, isGestor === false && { color: COLORS.accent.primary }]}>
+                        No, por app
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Campo costo gestor */}
+                  {isGestor === true && (
+                    <View style={s.fieldGroup}>
+                      <Text style={s.label}>Costo pagado al gestor (por pasajero)</Text>
+                      <View style={[s.inputRow, errors.gestorCost ? s.inputError : null]}>
+                        <View style={[s.inputIcon, { backgroundColor: COLORS.accent.warning + '1A' }]}>
+                          <Ionicons name="cash-outline" size={16} color={COLORS.accent.warning} />
+                        </View>
+                        <TextInput
+                          style={s.textInput}
+                          placeholder="0.00"
+                          placeholderTextColor={COLORS.text.muted}
+                          value={gestorCost}
+                          onChangeText={(v) => { setGestorCost(v); setErrors(e => ({ ...e, gestorCost: '' })); }}
+                          keyboardType="decimal-pad"
+                          autoFocus
+                        />
+                        <View style={[s.cupBadge, { backgroundColor: COLORS.accent.warning }]}>
+                          <Text style={s.cupText}>CUP</Text>
+                        </View>
+                      </View>
+                      {errors.gestorCost ? <Text style={s.error}>{errors.gestorCost}</Text> : null}
+                    </View>
+                  )}
+
+                  {/* Info automática cuando es por app */}
+                  {isGestor === false && selectedRoute && (
+                    <View style={[s.appCostInfo, { borderColor: COLORS.accent.primary + '44', backgroundColor: COLORS.accent.primary + '0D' }]}>
+                      <Ionicons name="phone-portrait-outline" size={16} color={COLORS.accent.primary} />
+                      <Text style={[s.appCostText, { color: COLORS.accent.primary }]}>
+                        Costo por app: {appPrice.toFixed(2)} CUP/pasajero × {passengerCount} = {(appPrice * passengerCount).toFixed(2)} CUP
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Preview ganancia */}
+                  {isGestor !== null && selectedRoute && (
+                    <View style={[s.gananciaPreview, { borderColor: gananciaPreview >= 0 ? COLORS.accent.success + '44' : COLORS.accent.danger + '44' }]}>
+                      <View style={s.gananciaRow}>
+                        <Text style={s.gananciaLabel}>Ingresos brutos</Text>
+                        <Text style={s.gananciaVal}>{subtotal.toFixed(2)} CUP</Text>
+                      </View>
+                      <View style={s.gananciaRow}>
+                        <Text style={s.gananciaLabel}>
+                          Costo {isGestor ? '(gestor)' : '(app)'} total
+                        </Text>
+                        <Text style={[s.gananciaVal, { color: COLORS.accent.danger }]}>
+                          -{totalCost.toFixed(2)} CUP
+                        </Text>
+                      </View>
+                      <View style={[s.gananciaDivider, { backgroundColor: gananciaPreview >= 0 ? COLORS.accent.success + '33' : COLORS.accent.danger + '33' }]} />
+                      <View style={s.gananciaRow}>
+                        <Text style={[s.gananciaLabelBold]}>Ganancia estimada</Text>
+                        <Text style={[s.gananciaBig, { color: gananciaPreview >= 0 ? COLORS.accent.success : COLORS.accent.danger }]}>
+                          {gananciaPreview >= 0 ? '+' : ''}{gananciaPreview.toFixed(2)} CUP
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+                </View>
+              )}
             </>
           )}
 
           {/* ── Pago ── */}
           <SectionHeader icon="wallet" label="Pago" color={accentColor} />
 
-          {/* Toggle anticipo */}
           <TouchableOpacity
             style={[s.toggleRow, { borderColor: advanceEnabled ? accentColor + '55' : COLORS.border.default }]}
             onPress={() => { setAdvanceEnabled(!advanceEnabled); if (advanceEnabled) setAdvance(''); }}
@@ -613,7 +751,6 @@ export default function AddReservationScreen() {
             </View>
           )}
 
-          {/* Resumen */}
           {selectedRoute && (
             <View style={[s.summaryCard, { borderColor: accentColor + '33' }]}>
               <Text style={s.summaryTitle}>Resumen de pago</Text>
@@ -658,7 +795,6 @@ export default function AddReservationScreen() {
         </View>
       </KeyboardAvoidingView>
 
-      {/* Date pickers */}
       <DateTimePickerModal
         isVisible={showTravelPicker}
         mode="date"
@@ -708,7 +844,6 @@ export default function AddReservationScreen() {
         )}
       />
 
-      {/* Modal origen */}
       <ListSelectorModal
         visible={showOriginModal}
         title="Provincia de Origen"
@@ -729,7 +864,6 @@ export default function AddReservationScreen() {
         )}
       />
 
-      {/* Modal destino */}
       <ListSelectorModal
         visible={showDestModal}
         title="Provincia de Destino"
@@ -796,4 +930,22 @@ const s = StyleSheet.create({
   saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.sm, paddingVertical: SPACING.md, borderRadius: RADIUS.full },
   btnDisabled: { opacity: 0.6 },
   saveBtnText: { color: '#fff', fontSize: FONT.sizes.md, fontWeight: FONT.weights.bold },
+
+  // ── Gestor styles ──
+  gestorBlock: { backgroundColor: COLORS.bg.card, borderRadius: RADIUS.xl, padding: SPACING.lg, borderWidth: 1, borderColor: COLORS.accent.warning + '33', gap: SPACING.md },
+  gestorHeader: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
+  gestorIconWrap: { width: 32, height: 32, borderRadius: RADIUS.full, justifyContent: 'center', alignItems: 'center' },
+  gestorTitle: { fontSize: FONT.sizes.md, color: COLORS.text.primary, fontWeight: FONT.weights.bold, flex: 1 },
+  gestorBtnRow: { flexDirection: 'row', gap: SPACING.sm },
+  gestorBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.xs, paddingVertical: SPACING.sm + 2, borderRadius: RADIUS.lg, borderWidth: 1.5, borderColor: COLORS.border.default, backgroundColor: COLORS.bg.input },
+  gestorBtnText: { fontSize: FONT.sizes.sm, color: COLORS.text.secondary, fontWeight: FONT.weights.semibold },
+  appCostInfo: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, padding: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1 },
+  appCostText: { fontSize: FONT.sizes.sm, fontWeight: FONT.weights.medium, flex: 1 },
+  gananciaPreview: { backgroundColor: COLORS.bg.elevated, borderRadius: RADIUS.lg, padding: SPACING.md, borderWidth: 1, gap: SPACING.sm },
+  gananciaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  gananciaLabel: { fontSize: FONT.sizes.sm, color: COLORS.text.secondary },
+  gananciaVal: { fontSize: FONT.sizes.sm, color: COLORS.text.primary, fontWeight: FONT.weights.medium },
+  gananciaDivider: { height: 1 },
+  gananciaLabelBold: { fontSize: FONT.sizes.md, color: COLORS.text.primary, fontWeight: FONT.weights.bold },
+  gananciaBig: { fontSize: FONT.sizes.lg, fontWeight: FONT.weights.extrabold },
 });

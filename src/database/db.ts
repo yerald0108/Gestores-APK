@@ -38,6 +38,9 @@ const initializeDatabase = async (database: SQLite.SQLiteDatabase): Promise<void
       advance REAL NOT NULL DEFAULT 0,
       total REAL NOT NULL,
       status TEXT NOT NULL DEFAULT 'Pendiente',
+      is_gestor INTEGER NOT NULL DEFAULT 0,
+      gestor_cost_per_passenger REAL NOT NULL DEFAULT 0,
+      app_cost_per_passenger REAL NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -55,7 +58,6 @@ const initializeDatabase = async (database: SQLite.SQLiteDatabase): Promise<void
     CREATE INDEX IF NOT EXISTS idx_passengers_reservation ON passengers(reservation_id);
   `);
 
-  // Migraciones — se ejecutan por separado con try/catch individual
   await runMigrations(database);
 };
 
@@ -65,7 +67,24 @@ const runMigrations = async (database: SQLite.SQLiteDatabase): Promise<void> => 
     await database.execAsync(
       `ALTER TABLE routes ADD COLUMN app_price REAL NOT NULL DEFAULT 0;`
     );
-  } catch (_) {
-    // Columna ya existe, ignorar
-  }
+  } catch (_) {}
+
+  // Migración 2: campos de gestor
+  try {
+    await database.execAsync(
+      `ALTER TABLE reservations ADD COLUMN is_gestor INTEGER NOT NULL DEFAULT 0;`
+    );
+  } catch (_) {}
+
+  try {
+    await database.execAsync(
+      `ALTER TABLE reservations ADD COLUMN gestor_cost_per_passenger REAL NOT NULL DEFAULT 0;`
+    );
+  } catch (_) {}
+
+  try {
+    await database.execAsync(
+      `ALTER TABLE reservations ADD COLUMN app_cost_per_passenger REAL NOT NULL DEFAULT 0;`
+    );
+  } catch (_) {}
 };

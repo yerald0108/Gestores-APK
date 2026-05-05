@@ -49,7 +49,7 @@ const MENU_CARDS: MenuCard[] = [
     icon: 'checkmark-circle',
     route: '/clients',
     color: '#F59E0B',
-    available: false,
+    available: true,
   },
   {
     id: 'reports',
