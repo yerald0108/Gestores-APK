@@ -8,6 +8,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, FONT, RADIUS, TRANSPORT_CONFIG } from '@/constants/theme';
 import { reservationsRepository } from '@/database/reservationsRepository';
+import { BANK_CONFIG } from '@/services/userProfileService';
 import { Reservation } from '@/types';
 
 function formatDate(dateStr: string) {
@@ -51,12 +52,16 @@ export default function ReservationsScreen() {
     // Línea de método de pago
     let paymentLine = '';
     if (item.payment_method) {
-      const { BANK_CONFIG } = require('@/services/userProfileService');
-      const bankLabel = BANK_CONFIG[item.payment_method]?.label ?? item.payment_method;
+      const bankLabel = BANK_CONFIG[item.payment_method as keyof typeof BANK_CONFIG]?.label ?? item.payment_method;
+
       if (item.payment_method === 'mitransfer') {
         paymentLine = `📲 *Pago:* MiTransfer — ${item.payment_confirm_number}`;
       } else {
-        paymentLine = `💳 *Pago:* ${bankLabel} — Número a confirmar: ${item.payment_confirm_number}`;
+        // Número completo para que el cliente lo copie directamente
+        const cardPart = item.payment_card_number
+          ? `Tarjeta: \`${item.payment_card_number}\``
+          : bankLabel;
+        paymentLine = `💳 *Pago:* ${bankLabel}\n${cardPart}\nConfirmar al: ${item.payment_confirm_number}`;
       }
     }
 

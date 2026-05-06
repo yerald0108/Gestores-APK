@@ -1,7 +1,7 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  ActivityIndicator, Dimensions,
+  ActivityIndicator, Dimensions, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -389,14 +389,17 @@ export default function ReportsScreen() {
       ]);
       setGlobal(g);
       setPeriodData(pd);
+    } catch (err) {
+      console.error('[ReportsScreen] Error al cargar estadísticas:', err);
+      Alert.alert('Error', 'No se pudieron cargar los reportes. Intenta de nuevo.');
     } finally {
       setLoading(false);
     }
   }, []);
 
+  // useFocusEffect recarga al volver a la pantalla Y cuando cambia el período.
+  // No se necesita un useEffect adicional para 'period' — haría una doble carga.
   useFocusEffect(useCallback(() => { load(period); }, [period]));
-
-  useEffect(() => { load(period); }, [period]);
 
   const periodLabel = period === 'day' ? 'últimos 14 días' : period === 'week' ? 'últimas 8 semanas' : 'últimos 6 meses';
 

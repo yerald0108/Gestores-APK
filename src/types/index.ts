@@ -39,6 +39,7 @@ export interface Reservation {
   // Método de pago
   payment_method: string;         // banco key: 'metropolitano' | 'bandec' | etc.
   payment_confirm_number: string; // número a confirmar o MiTransfer manual
+  payment_card_number: string;    // número de tarjeta registrado en el perfil
   created_at: string;
   updated_at: string;
   passengers?: Passenger[];
@@ -60,6 +61,7 @@ export interface CreateReservationDTO {
   app_cost_per_passenger?: number;
   payment_method?: string;
   payment_confirm_number?: string;
+  payment_card_number?: string;
   passengers: Omit<Passenger, 'id' | 'reservation_id'>[];
 }
 

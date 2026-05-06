@@ -62,42 +62,49 @@ const initializeDatabase = async (database: SQLite.SQLiteDatabase): Promise<void
 };
 
 const runMigrations = async (database: SQLite.SQLiteDatabase): Promise<void> => {
+  /**
+   * Ejecuta un ALTER TABLE de forma idempotente.
+   * SQLite lanza un error cuando la columna ya existe; ese caso concreto
+   * se ignora (es el comportamiento esperado en re-ejecuciones).
+   * Cualquier otro error se propaga para no ocultar bugs reales.
+   */
+  const addColumnIfNotExists = async (sql: string): Promise<void> => {
+    try {
+      await database.execAsync(sql);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (!message.toLowerCase().includes('duplicate column name')) {
+        throw err;
+      }
+    }
+  };
+
   // Migración 1: añadir app_price a routes si no existe
-  try {
-    await database.execAsync(
-      `ALTER TABLE routes ADD COLUMN app_price REAL NOT NULL DEFAULT 0;`
-    );
-  } catch (_) {}
+  await addColumnIfNotExists(
+    `ALTER TABLE routes ADD COLUMN app_price REAL NOT NULL DEFAULT 0;`
+  );
 
-  // Migración 2: campos de gestor
-  try {
-    await database.execAsync(
-      `ALTER TABLE reservations ADD COLUMN is_gestor INTEGER NOT NULL DEFAULT 0;`
-    );
-  } catch (_) {}
+  // Migración 2: campos de gestor en reservations
+  await addColumnIfNotExists(
+    `ALTER TABLE reservations ADD COLUMN is_gestor INTEGER NOT NULL DEFAULT 0;`
+  );
+  await addColumnIfNotExists(
+    `ALTER TABLE reservations ADD COLUMN gestor_cost_per_passenger REAL NOT NULL DEFAULT 0;`
+  );
+  await addColumnIfNotExists(
+    `ALTER TABLE reservations ADD COLUMN app_cost_per_passenger REAL NOT NULL DEFAULT 0;`
+  );
 
-  try {
-    await database.execAsync(
-      `ALTER TABLE reservations ADD COLUMN gestor_cost_per_passenger REAL NOT NULL DEFAULT 0;`
-    );
-  } catch (_) {}
+  // Migración 3: método de pago en reservations
+  await addColumnIfNotExists(
+    `ALTER TABLE reservations ADD COLUMN payment_method TEXT NOT NULL DEFAULT '';`
+  );
+  await addColumnIfNotExists(
+    `ALTER TABLE reservations ADD COLUMN payment_confirm_number TEXT NOT NULL DEFAULT '';`
+  );
 
-  try {
-    await database.execAsync(
-      `ALTER TABLE reservations ADD COLUMN app_cost_per_passenger REAL NOT NULL DEFAULT 0;`
-    );
-  } catch (_) {}
-
-  // Migración 3: método de pago
-  try {
-    await database.execAsync(
-      `ALTER TABLE reservations ADD COLUMN payment_method TEXT NOT NULL DEFAULT '';`
-    );
-  } catch (_) {}
-
-  try {
-    await database.execAsync(
-      `ALTER TABLE reservations ADD COLUMN payment_confirm_number TEXT NOT NULL DEFAULT '';`
-    );
-  } catch (_) {}
+  // Migración 4: número de tarjeta (se muestra en la factura de WhatsApp)
+  await addColumnIfNotExists(
+    `ALTER TABLE reservations ADD COLUMN payment_card_number TEXT NOT NULL DEFAULT '';`
+  );
 };

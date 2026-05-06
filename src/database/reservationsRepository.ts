@@ -1,56 +1,77 @@
 import { getDatabase } from './db';
 import { Reservation, CreateReservationDTO, Passenger } from '../types';
 
+// ── Helpers internos ──────────────────────────────────────────────────────────
+
+/**
+ * Hidrata un array de reservaciones con sus pasajeros en exactamente 2 queries:
+ * una para las reservaciones (ya cargadas) y otra para TODOS sus pasajeros.
+ * Esto evita el patrón N+1 (una query por reservación).
+ */
+async function attachPassengers(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  reservations: Reservation[],
+): Promise<Reservation[]> {
+  if (reservations.length === 0) return reservations;
+
+  const ids = reservations.map((r) => r.id);
+  const placeholders = ids.map(() => '?').join(', ');
+
+  const allPassengers = await db.getAllAsync<Passenger>(
+    `SELECT * FROM passengers WHERE reservation_id IN (${placeholders})`,
+    ids,
+  );
+
+  // Agrupa pasajeros por reservation_id en un Map para acceso O(1)
+  const passengerMap = new Map<number, Passenger[]>();
+  for (const p of allPassengers) {
+    const rid = p.reservation_id!;
+    if (!passengerMap.has(rid)) passengerMap.set(rid, []);
+    passengerMap.get(rid)!.push(p);
+  }
+
+  for (const r of reservations) {
+    r.passengers = passengerMap.get(r.id) ?? [];
+  }
+
+  return reservations;
+}
+
+// ── Repositorio ───────────────────────────────────────────────────────────────
+
 export const reservationsRepository = {
   async getAll(): Promise<Reservation[]> {
     const db = await getDatabase();
     const reservations = await db.getAllAsync<Reservation>(
-      'SELECT * FROM reservations ORDER BY created_at DESC'
+      'SELECT * FROM reservations ORDER BY created_at DESC',
     );
-    for (const r of reservations) {
-      r.passengers = await db.getAllAsync<Passenger>(
-        'SELECT * FROM passengers WHERE reservation_id = ?', [r.id]
-      );
-    }
-    return reservations;
+    return attachPassengers(db, reservations);
   },
 
   async getPending(): Promise<Reservation[]> {
     const db = await getDatabase();
     const reservations = await db.getAllAsync<Reservation>(
-      "SELECT * FROM reservations WHERE status = 'Pendiente' ORDER BY created_at DESC"
+      "SELECT * FROM reservations WHERE status = 'Pendiente' ORDER BY created_at DESC",
     );
-    for (const r of reservations) {
-      r.passengers = await db.getAllAsync<Passenger>(
-        'SELECT * FROM passengers WHERE reservation_id = ?', [r.id]
-      );
-    }
-    return reservations;
+    return attachPassengers(db, reservations);
   },
 
   async getReserved(): Promise<Reservation[]> {
     const db = await getDatabase();
     const reservations = await db.getAllAsync<Reservation>(
-      "SELECT * FROM reservations WHERE status = 'Reservado' ORDER BY created_at DESC"
+      "SELECT * FROM reservations WHERE status = 'Reservado' ORDER BY created_at DESC",
     );
-    for (const r of reservations) {
-      r.passengers = await db.getAllAsync<Passenger>(
-        'SELECT * FROM passengers WHERE reservation_id = ?', [r.id]
-      );
-    }
-    return reservations;
+    return attachPassengers(db, reservations);
   },
 
   async getById(id: number): Promise<Reservation | null> {
     const db = await getDatabase();
     const r = await db.getFirstAsync<Reservation>(
-      'SELECT * FROM reservations WHERE id = ?', [id]
+      'SELECT * FROM reservations WHERE id = ?', [id],
     );
     if (!r) return null;
-    r.passengers = await db.getAllAsync<Passenger>(
-      'SELECT * FROM passengers WHERE reservation_id = ?', [r.id]
-    );
-    return r;
+    const [hydrated] = await attachPassengers(db, [r]);
+    return hydrated;
   },
 
   async create(data: CreateReservationDTO): Promise<Reservation> {
@@ -59,8 +80,8 @@ export const reservationsRepository = {
       `INSERT INTO reservations 
         (phone, transport, origin, destination, route_price, travel_date, reservation_date,
          advance, total, status, is_gestor, gestor_cost_per_passenger, app_cost_per_passenger,
-         payment_method, payment_confirm_number)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         payment_method, payment_confirm_number, payment_card_number)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [data.phone, data.transport, data.origin, data.destination,
        data.route_price, data.travel_date, data.reservation_date,
        data.advance, data.total, data.status,
@@ -68,7 +89,8 @@ export const reservationsRepository = {
        data.gestor_cost_per_passenger ?? 0,
        data.app_cost_per_passenger ?? 0,
        data.payment_method ?? '',
-       data.payment_confirm_number ?? '']
+       data.payment_confirm_number ?? '',
+       data.payment_card_number ?? '']
     );
     const reservationId = result.lastInsertRowId;
     for (const p of data.passengers) {

@@ -5,6 +5,7 @@ import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, FONT, RADIUS, TRANSPORT_CONFIG } from '@/constants/theme';
 import { reservationsRepository } from '@/database/reservationsRepository';
+import { BANK_CONFIG } from '@/services/userProfileService';
 import { Reservation } from '@/types';
 
 function InfoRow({ icon, label, value, color }: { icon: string; label: string; value: string; color: string }) {
@@ -43,6 +44,23 @@ export default function ReservationDetailScreen() {
     const passengerList = (reservation.passengers ?? []).map((p, i) =>
       `  ${i + 1}. ${p.full_name} (CI: ${p.identity_card})`
     ).join('\n');
+
+    // Línea de método de pago
+    let paymentLine = '';
+    if (reservation.payment_method) {
+      const bankLabel = BANK_CONFIG[reservation.payment_method as keyof typeof BANK_CONFIG]?.label ?? reservation.payment_method;
+
+      if (reservation.payment_method === 'mitransfer') {
+        paymentLine = `📲 *Pago:* MiTransfer — ${reservation.payment_confirm_number}`;
+      } else {
+        // Número completo para que el cliente lo copie directamente
+        const cardPart = reservation.payment_card_number
+          ? `Tarjeta: \`${reservation.payment_card_number}\``
+          : bankLabel;
+        paymentLine = `💳 *Pago:* ${bankLabel}\n${cardPart}\nConfirmar al: ${reservation.payment_confirm_number}`;
+      }
+    }
+
     const msg = [
       `🧳 *Reservación #${reservation.id} — Viajando*`,
       ``,
@@ -57,6 +75,7 @@ export default function ReservationDetailScreen() {
       `💰 *Precio/pasajero:* ${reservation.route_price.toFixed(2)} CUP`,
       reservation.advance > 0 ? `✅ *Anticipo:* ${reservation.advance.toFixed(2)} CUP` : '',
       `💳 *Total a pagar:* ${reservation.total.toFixed(2)} CUP`,
+      paymentLine,
       `📊 *Estado:* ${reservation.status}`,
     ].filter(Boolean).join('\n');
 

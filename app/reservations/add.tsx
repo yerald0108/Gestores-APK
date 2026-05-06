@@ -352,6 +352,7 @@ export default function AddReservationScreen() {
       const finalAppCost = appPrice;
       const finalPaymentMethod = paymentSelection?.card.bank ?? '';
       const finalPaymentConfirm = paymentSelection?.confirmNumber ?? '';
+      const finalPaymentCardNumber = paymentSelection?.card.cardNumber ?? '';
 
       if (isEditing) {
         const db = await getDatabase();
@@ -359,14 +360,14 @@ export default function AddReservationScreen() {
           `UPDATE reservations SET phone=?, transport=?, origin=?, destination=?,
           route_price=?, travel_date=?, reservation_date=?, advance=?, total=?,
           status=?, is_gestor=?, gestor_cost_per_passenger=?, app_cost_per_passenger=?,
-          payment_method=?, payment_confirm_number=?,
+          payment_method=?, payment_confirm_number=?, payment_card_number=?,
           updated_at=?
           WHERE id=?`,
           [phone.trim(), transport, origin, destination, routePrice,
           travelISO, reservationISO, advanceNum, total,
           isReserved ? 'Reservado' : 'Pendiente',
           finalIsGestor, finalGestorCost, finalAppCost,
-          finalPaymentMethod, finalPaymentConfirm,
+          finalPaymentMethod, finalPaymentConfirm, finalPaymentCardNumber,
           new Date().toISOString(),
           Number(editId)]
         );
@@ -393,6 +394,7 @@ export default function AddReservationScreen() {
           app_cost_per_passenger: finalAppCost,
           payment_method: finalPaymentMethod,
           payment_confirm_number: finalPaymentConfirm,
+          payment_card_number: finalPaymentCardNumber,
           passengers,
         });
       }
