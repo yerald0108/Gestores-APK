@@ -87,4 +87,17 @@ const runMigrations = async (database: SQLite.SQLiteDatabase): Promise<void> => 
       `ALTER TABLE reservations ADD COLUMN app_cost_per_passenger REAL NOT NULL DEFAULT 0;`
     );
   } catch (_) {}
+
+  // Migración 3: método de pago
+  try {
+    await database.execAsync(
+      `ALTER TABLE reservations ADD COLUMN payment_method TEXT NOT NULL DEFAULT '';`
+    );
+  } catch (_) {}
+
+  try {
+    await database.execAsync(
+      `ALTER TABLE reservations ADD COLUMN payment_confirm_number TEXT NOT NULL DEFAULT '';`
+    );
+  } catch (_) {}
 };

@@ -14,6 +14,8 @@ import { routesRepository } from '@/database/routesRepository';
 import { reservationsRepository } from '@/database/reservationsRepository';
 import { getDatabase } from '@/database/db';
 import { Route, TransportType, Passenger } from '@/types';
+import PaymentMethodSelector, { PaymentSelection } from '@/components/PaymentMethodSelector';
+import { BANK_CONFIG } from '@/services/userProfileService';
 
 // ── Modal selector genérico ─────────────────────────────────────────────────
 function ListSelectorModal<T>({ visible, title, subtitle, items, selected, renderItem, keyExtractor, onClose }: {
@@ -183,8 +185,12 @@ export default function AddReservationScreen() {
   const [isReserved, setIsReserved] = useState(false);
 
   // ── Campos de gestor ──
-  const [isGestor, setIsGestor] = useState<boolean | null>(null); // null = sin responder
-  const [gestorCost, setGestorCost] = useState(''); // monto por pasajero al gestor
+  const [isGestor, setIsGestor] = useState<boolean | null>(null);
+  const [gestorCost, setGestorCost] = useState('');
+
+  // ── Método de pago ──
+  const [paymentSelection, setPaymentSelection] = useState<PaymentSelection | null>(null);
+  const [showPaymentSelector, setShowPaymentSelector] = useState(false);
 
   const [routes, setRoutes] = useState<Route[]>([]);
   const [availableRoutes, setAvailableRoutes] = useState<Route[]>([]);
@@ -222,6 +228,17 @@ export default function AddReservationScreen() {
           if (r.is_gestor === 1) {
             setGestorCost(r.gestor_cost_per_passenger.toString());
           }
+        }
+        // Cargar método de pago si existe
+        if (r.payment_method) {
+          // Reconstruimos la selección mínima para mostrar el badge
+          const { userProfileService: ups } = require('@/services/userProfileService');
+          ups.get().then((profile: any) => {
+            const card = profile.cards.find((c: any) => c.bank === r.payment_method);
+            if (card) {
+              setPaymentSelection({ card, confirmNumber: r.payment_confirm_number });
+            }
+          });
         }
       });
     }
@@ -332,7 +349,9 @@ export default function AddReservationScreen() {
       const reservationISO = formatDateISO(reservationDate!);
       const finalIsGestor = isReserved ? (isGestor ? 1 : 0) : 0;
       const finalGestorCost = isReserved && isGestor ? gestorCostNum : 0;
-      const finalAppCost = appPrice; // siempre guardamos el app_price snapshot
+      const finalAppCost = appPrice;
+      const finalPaymentMethod = paymentSelection?.card.bank ?? '';
+      const finalPaymentConfirm = paymentSelection?.confirmNumber ?? '';
 
       if (isEditing) {
         const db = await getDatabase();
@@ -340,12 +359,14 @@ export default function AddReservationScreen() {
           `UPDATE reservations SET phone=?, transport=?, origin=?, destination=?,
           route_price=?, travel_date=?, reservation_date=?, advance=?, total=?,
           status=?, is_gestor=?, gestor_cost_per_passenger=?, app_cost_per_passenger=?,
+          payment_method=?, payment_confirm_number=?,
           updated_at=?
           WHERE id=?`,
           [phone.trim(), transport, origin, destination, routePrice,
           travelISO, reservationISO, advanceNum, total,
           isReserved ? 'Reservado' : 'Pendiente',
           finalIsGestor, finalGestorCost, finalAppCost,
+          finalPaymentMethod, finalPaymentConfirm,
           new Date().toISOString(),
           Number(editId)]
         );
@@ -370,6 +391,8 @@ export default function AddReservationScreen() {
           is_gestor: finalIsGestor,
           gestor_cost_per_passenger: finalGestorCost,
           app_cost_per_passenger: finalAppCost,
+          payment_method: finalPaymentMethod,
+          payment_confirm_number: finalPaymentConfirm,
           passengers,
         });
       }
@@ -714,6 +737,60 @@ export default function AddReservationScreen() {
           {/* ── Pago ── */}
           <SectionHeader icon="wallet" label="Pago" color={accentColor} />
 
+          {/* Método de pago */}
+          <TouchableOpacity
+            style={[
+              s.toggleRow,
+              {
+                borderColor: paymentSelection
+                  ? BANK_CONFIG[paymentSelection.card.bank].color + '88'
+                  : COLORS.border.default,
+                backgroundColor: paymentSelection
+                  ? BANK_CONFIG[paymentSelection.card.bank].color + '0D'
+                  : COLORS.bg.input,
+              },
+            ]}
+            onPress={() => setShowPaymentSelector(true)}
+            activeOpacity={0.7}
+          >
+            <View style={[
+              s.inputIcon,
+              {
+                backgroundColor: paymentSelection
+                  ? BANK_CONFIG[paymentSelection.card.bank].color + '22'
+                  : COLORS.bg.elevated,
+              },
+            ]}>
+              <Ionicons
+                name={paymentSelection ? BANK_CONFIG[paymentSelection.card.bank].icon as any : 'card-outline'}
+                size={16}
+                color={paymentSelection ? BANK_CONFIG[paymentSelection.card.bank].color : COLORS.text.muted}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[
+                s.toggleLabel,
+                { color: paymentSelection ? BANK_CONFIG[paymentSelection.card.bank].color : COLORS.text.primary },
+              ]}>
+                {paymentSelection ? BANK_CONFIG[paymentSelection.card.bank].label : 'Método de pago'}
+              </Text>
+              <Text style={s.toggleHint}>
+                {paymentSelection
+                  ? `Confirmar: ${paymentSelection.confirmNumber}`
+                  : 'Opcional — elige una tarjeta configurada'}
+              </Text>
+            </View>
+            {paymentSelection
+              ? <TouchableOpacity
+                  onPress={(e) => { e.stopPropagation(); setPaymentSelection(null); }}
+                  style={{ padding: 4 }}
+                >
+                  <Ionicons name="close-circle" size={20} color={COLORS.text.muted} />
+                </TouchableOpacity>
+              : <Ionicons name="chevron-forward" size={18} color={COLORS.text.muted} />
+            }
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={[s.toggleRow, { borderColor: advanceEnabled ? accentColor + '55' : COLORS.border.default }]}
             onPress={() => { setAdvanceEnabled(!advanceEnabled); if (advanceEnabled) setAdvance(''); }}
@@ -882,6 +959,12 @@ export default function AddReservationScreen() {
             <Text style={{ flex: 1, fontSize: FONT.sizes.md, color: isSel ? accentColor : COLORS.text.primary, fontWeight: isSel ? FONT.weights.semibold : FONT.weights.regular }}>{item}</Text>
           </TouchableOpacity>
         )}
+      />
+      {/* Selector de método de pago */}
+      <PaymentMethodSelector
+        visible={showPaymentSelector}
+        onSelect={(sel) => setPaymentSelection(sel)}
+        onClose={() => setShowPaymentSelector(false)}
       />
     </SafeAreaView>
   );

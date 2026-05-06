@@ -47,6 +47,19 @@ export default function ReservationsScreen() {
       `  ${i + 1}. ${p.full_name} (CI: ${p.identity_card})`
     ).join('\n');
     const passengerCount = item.passengers?.length ?? 0;
+
+    // Línea de método de pago
+    let paymentLine = '';
+    if (item.payment_method) {
+      const { BANK_CONFIG } = require('@/services/userProfileService');
+      const bankLabel = BANK_CONFIG[item.payment_method]?.label ?? item.payment_method;
+      if (item.payment_method === 'mitransfer') {
+        paymentLine = `📲 *Pago:* MiTransfer — ${item.payment_confirm_number}`;
+      } else {
+        paymentLine = `💳 *Pago:* ${bankLabel} — Número a confirmar: ${item.payment_confirm_number}`;
+      }
+    }
+
     const msg = [
       `🧳 *Pedido #${item.id} — Viajando*`,
       ``,
@@ -61,6 +74,7 @@ export default function ReservationsScreen() {
       `💰 *Precio/pasajero:* ${item.route_price.toFixed(2)} CUP`,
       item.advance > 0 ? `✅ *Anticipo:* ${item.advance.toFixed(2)} CUP` : '',
       `💳 *Total a pagar:* ${item.total.toFixed(2)} CUP`,
+      paymentLine,
     ].filter(Boolean).join('\n');
     const clean = item.phone.replace(/\D/g, '');
     Linking.openURL(`whatsapp://send?phone=53${clean}&text=${encodeURIComponent(msg)}`)

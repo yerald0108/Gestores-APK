@@ -212,9 +212,13 @@ function ReservationCard({ item, onDelete }: {
 
       {/* ── Acciones ── */}
       <View style={card.actions}>
-        <TouchableOpacity style={[card.actionBtn, card.deleteBtn]} onPress={onDelete}>
-          <Ionicons name="trash-outline" size={16} color={COLORS.accent.danger} />
-          <Text style={[card.actionText, { color: COLORS.accent.danger }]}>Eliminar reserva</Text>
+        <TouchableOpacity
+          style={card.deleteBtn}
+          onPress={onDelete}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="trash-outline" size={17} color={COLORS.accent.danger} />
+          <Text style={card.deleteText}>Eliminar reserva</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -259,11 +263,24 @@ const card = StyleSheet.create({
   dateItem: { flex: 1, backgroundColor: COLORS.bg.elevated, borderRadius: RADIUS.md, padding: SPACING.sm, alignItems: 'center' },
   dateLabel: { fontSize: FONT.sizes.xs, color: COLORS.text.muted },
   dateVal: { fontSize: FONT.sizes.sm, color: COLORS.text.primary, fontWeight: FONT.weights.semibold, marginTop: 2 },
-  actions: { flexDirection: 'row', gap: SPACING.sm, paddingTop: SPACING.xs, borderTopWidth: 1, borderTopColor: COLORS.border.default },
-  actionBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.xs, paddingVertical: SPACING.sm, borderRadius: RADIUS.lg, borderWidth: 1 },
-  waBtn: { flex: 1, backgroundColor: '#25D36614', borderColor: '#25D36644' },
-  deleteBtn: { width: 42, backgroundColor: COLORS.accent.danger + '14', borderColor: COLORS.accent.danger + '44' },
-  actionText: { fontSize: FONT.sizes.sm, fontWeight: FONT.weights.semibold },
+  actions: { paddingTop: SPACING.md, borderTopWidth: 1, borderTopColor: COLORS.border.default },
+  deleteBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.lg,
+    backgroundColor: COLORS.accent.danger + '0D',
+    borderWidth: 1.5,
+    borderColor: COLORS.accent.danger + '33',
+  },
+  deleteText: {
+    fontSize: FONT.sizes.sm,
+    fontWeight: FONT.weights.semibold,
+    color: COLORS.accent.danger,
+  },
 });
 
 // ── Pantalla principal ───────────────────────────────────────────────────────

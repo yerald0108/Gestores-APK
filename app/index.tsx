@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, FONT, RADIUS } from '@/constants/theme';
+import UserProfileModal from '@/components/UserProfileModal';
 
 const { width } = Dimensions.get('window');
 
@@ -63,6 +64,8 @@ const MENU_CARDS: MenuCard[] = [
 ];
 
 export default function HomeScreen() {
+  const [profileVisible, setProfileVisible] = useState(false);
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -71,9 +74,13 @@ export default function HomeScreen() {
           <Text style={styles.greeting}>Panel de Control</Text>
           <Text style={styles.appName}>Viajando</Text>
         </View>
-        <View style={styles.avatarContainer}>
+        <TouchableOpacity
+          style={styles.avatarContainer}
+          onPress={() => setProfileVisible(true)}
+          activeOpacity={0.7}
+        >
           <Ionicons name="person" size={20} color={COLORS.accent.primary} />
-        </View>
+        </TouchableOpacity>
       </View>
 
       {/* Subtitle */}
@@ -121,6 +128,12 @@ export default function HomeScreen() {
         <Ionicons name="shield-checkmark" size={14} color={COLORS.text.muted} />
         <Text style={styles.footerText}>Datos almacenados localmente • Modo offline</Text>
       </View>
+
+      {/* Modal de perfil */}
+      <UserProfileModal
+        visible={profileVisible}
+        onClose={() => setProfileVisible(false)}
+      />
     </SafeAreaView>
   );
 }

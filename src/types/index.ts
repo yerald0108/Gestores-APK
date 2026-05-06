@@ -33,9 +33,12 @@ export interface Reservation {
   total: number;
   status: ReservationStatus;
   // Campos de gestor
-  is_gestor: number;           // 0 = no, 1 = sí
+  is_gestor: number;
   gestor_cost_per_passenger: number;
   app_cost_per_passenger: number;
+  // Método de pago
+  payment_method: string;         // banco key: 'metropolitano' | 'bandec' | etc.
+  payment_confirm_number: string; // número a confirmar o MiTransfer manual
   created_at: string;
   updated_at: string;
   passengers?: Passenger[];
@@ -55,6 +58,8 @@ export interface CreateReservationDTO {
   is_gestor?: number;
   gestor_cost_per_passenger?: number;
   app_cost_per_passenger?: number;
+  payment_method?: string;
+  payment_confirm_number?: string;
   passengers: Omit<Passenger, 'id' | 'reservation_id'>[];
 }
 
