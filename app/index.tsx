@@ -58,7 +58,7 @@ const MENU_CARDS: MenuCard[] = [
     icon: 'bar-chart',
     route: '/reports',
     color: '#8B5CF6',
-    available: false,
+    available: true,
   },
 ];
 

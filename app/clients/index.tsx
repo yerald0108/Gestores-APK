@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
-  ActivityIndicator, Alert, Linking
+  ActivityIndicator, Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -37,10 +37,9 @@ const fr = StyleSheet.create({
 });
 
 // ── Tarjeta de reserva ───────────────────────────────────────────────────────
-function ReservationCard({ item, onDelete, onWhatsApp }: {
+function ReservationCard({ item, onDelete }: {
   item: Reservation;
   onDelete: () => void;
-  onWhatsApp: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const tc = TRANSPORT_CONFIG[item.transport];
@@ -213,12 +212,9 @@ function ReservationCard({ item, onDelete, onWhatsApp }: {
 
       {/* ── Acciones ── */}
       <View style={card.actions}>
-        <TouchableOpacity style={[card.actionBtn, card.waBtn]} onPress={onWhatsApp}>
-          <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
-          <Text style={[card.actionText, { color: '#25D366' }]}>WhatsApp</Text>
-        </TouchableOpacity>
         <TouchableOpacity style={[card.actionBtn, card.deleteBtn]} onPress={onDelete}>
           <Ionicons name="trash-outline" size={16} color={COLORS.accent.danger} />
+          <Text style={[card.actionText, { color: COLORS.accent.danger }]}>Eliminar reserva</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -308,31 +304,6 @@ export default function ClientsScreen() {
     ]);
   };
 
-  const handleWhatsApp = (item: Reservation) => {
-    const tc = TRANSPORT_CONFIG[item.transport];
-    const fin = calcFinancials(item);
-    const passengerList = (item.passengers ?? [])
-      .map((p, i) => `  ${i + 1}. ${p.full_name} (CI: ${p.identity_card})`).join('\n');
-    const msg = [
-      `✅ *Reserva #${item.id} confirmada — Viajando*`,
-      ``,
-      `🚌 *Transporte:* ${tc.label}`,
-      `📍 *Ruta:* ${item.origin} → ${item.destination}`,
-      `📋 *Fecha de reserva:* ${new Date(item.reservation_date).toLocaleDateString('es-ES')}`,
-      `📅 *Fecha de viaje:* ${new Date(item.travel_date).toLocaleDateString('es-ES')}`,
-      ``,
-      `👥 *Pasajeros (${fin.passengerCount}):*`,
-      passengerList,
-      ``,
-      `💰 *Precio/pasajero:* ${item.route_price.toFixed(2)} CUP`,
-      fin.advancePaid > 0 ? `✅ *Anticipo pagado:* ${fin.advancePaid.toFixed(2)} CUP` : '',
-      `💳 *Pendiente de pago:* ${fin.restToCobrar.toFixed(2)} CUP`,
-    ].filter(Boolean).join('\n');
-    const clean = item.phone.replace(/\D/g, '');
-    Linking.openURL(`whatsapp://send?phone=53${clean}&text=${encodeURIComponent(msg)}`)
-      .catch(() => Alert.alert('WhatsApp no disponible'));
-  };
-
   return (
     <SafeAreaView style={s.container}>
       {/* Header */}
@@ -410,7 +381,6 @@ export default function ClientsScreen() {
             <ReservationCard
               item={item}
               onDelete={() => handleDelete(item)}
-              onWhatsApp={() => handleWhatsApp(item)}
             />
           )}
         />

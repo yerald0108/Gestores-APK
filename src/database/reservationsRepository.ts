@@ -114,4 +114,111 @@ export const reservationsRepository = {
     const db = await getDatabase();
     await db.runAsync('DELETE FROM reservations WHERE id = ?', [id]);
   },
+
+  // ── Estadísticas para reportes ──────────────────────────────────────────
+  async getStatsAll(): Promise<{
+    totalGanancia: number;
+    totalPasajeros: number;
+    totalReservas: number;
+    totalPedidos: number;
+    gananciaGestor: number;
+    gananciaApp: number;
+  }> {
+    const db = await getDatabase();
+
+    const reservadas = await db.getAllAsync<any>(
+      `SELECT r.*, COUNT(p.id) as pax
+       FROM reservations r
+       LEFT JOIN passengers p ON p.reservation_id = r.id
+       WHERE r.status = 'Reservado'
+       GROUP BY r.id`
+    );
+    let totalGanancia = 0;
+    let totalPasajeros = 0;
+    let gananciaGestor = 0;
+    let gananciaApp = 0;
+    for (const r of reservadas) {
+      const pax = r.pax ?? 0;
+      const ingresos = r.route_price * pax;
+      const costo = r.is_gestor === 1
+        ? r.gestor_cost_per_passenger * pax
+        : r.app_cost_per_passenger * pax;
+      const ganancia = ingresos - costo;
+      totalGanancia += ganancia;
+      totalPasajeros += pax;
+      if (r.is_gestor === 1) gananciaGestor += ganancia;
+      else gananciaApp += ganancia;
+    }
+
+    const pendientes = await db.getFirstAsync<{ cnt: number }>(
+      `SELECT COUNT(*) as cnt FROM reservations WHERE status = 'Pendiente'`
+    );
+
+    return {
+      totalGanancia,
+      totalPasajeros,
+      totalReservas: reservadas.length,
+      totalPedidos: pendientes?.cnt ?? 0,
+      gananciaGestor,
+      gananciaApp,
+    };
+  },
+
+  async getStatsByPeriod(period: 'day' | 'week' | 'month'): Promise<
+    { label: string; ganancia: number; pasajeros: number; reservas: number }[]
+  > {
+    const db = await getDatabase();
+
+    // Traemos todas las reservadas con pasajeros
+    const rows = await db.getAllAsync<any>(
+      `SELECT r.reservation_date, r.route_price, r.is_gestor,
+              r.gestor_cost_per_passenger, r.app_cost_per_passenger,
+              COUNT(p.id) as pax
+       FROM reservations r
+       LEFT JOIN passengers p ON p.reservation_id = r.id
+       WHERE r.status = 'Reservado'
+       GROUP BY r.id
+       ORDER BY r.reservation_date ASC`
+    );
+
+    // Agrupamos en JS según el período
+    const map = new Map<string, { ganancia: number; pasajeros: number; reservas: number }>();
+
+    for (const r of rows) {
+      const date = new Date(r.reservation_date);
+      let label = '';
+
+      if (period === 'day') {
+        // Últimos 14 días — label: "DD/MM"
+        label = `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}`;
+      } else if (period === 'week') {
+        // Semana del año — label: "Sem N"
+        const start = new Date(date);
+        start.setDate(date.getDate() - date.getDay());
+        label = `${String(start.getDate()).padStart(2, '0')}/${String(start.getMonth() + 1).padStart(2, '0')}`;
+      } else {
+        // Mes — label: "Ene 25"
+        const months = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+        label = `${months[date.getMonth()]} ${String(date.getFullYear()).slice(2)}`;
+      }
+
+      const pax = r.pax ?? 0;
+      const ingresos = r.route_price * pax;
+      const costo = r.is_gestor === 1
+        ? r.gestor_cost_per_passenger * pax
+        : r.app_cost_per_passenger * pax;
+      const ganancia = ingresos - costo;
+
+      if (!map.has(label)) map.set(label, { ganancia: 0, pasajeros: 0, reservas: 0 });
+      const entry = map.get(label)!;
+      entry.ganancia += ganancia;
+      entry.pasajeros += pax;
+      entry.reservas += 1;
+    }
+
+    // Limitamos a los últimos N períodos según tipo
+    const limit = period === 'day' ? 14 : period === 'week' ? 8 : 6;
+    const all = Array.from(map.entries()).map(([label, v]) => ({ label, ...v }));
+    return all.slice(-limit);
+  },
 };
