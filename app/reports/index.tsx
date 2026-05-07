@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   ActivityIndicator, Dimensions, Alert,
 } from 'react-native';
+import Svg, { Circle, G } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -225,10 +226,36 @@ function DonutChart({ gestor, app }: { gestor: number; app: number }) {
 
   return (
     <View style={donut.wrapper}>
-      {/* Simulamos la dona con dos arcos usando Views superpuestos */}
-      <View style={[donut.ring, { width: SIZE, height: SIZE, borderRadius: SIZE / 2, borderWidth: STROKE, borderColor: COLORS.accent.primary + '33' }]}>
-        {/* Segmento gestor — overlay visual simple */}
-        <View style={donut.center}>
+      <View style={{ position: 'relative', width: SIZE, height: SIZE, justifyContent: 'center', alignItems: 'center' }}>
+        <Svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
+          <G rotation="-90" origin={`${SIZE/2}, ${SIZE/2}`}>
+            {/* Background App Circle */}
+            <Circle
+              cx={SIZE/2}
+              cy={SIZE/2}
+              r={R}
+              stroke={COLORS.accent.primary}
+              strokeWidth={STROKE}
+              fill="transparent"
+              strokeDasharray={`${dashApp} ${CIRC}`}
+              strokeDashoffset={0}
+              strokeLinecap="round"
+            />
+            {/* Foreground Gestor Circle */}
+            <Circle
+              cx={SIZE/2}
+              cy={SIZE/2}
+              r={R}
+              stroke={COLORS.accent.warning}
+              strokeWidth={STROKE}
+              fill="transparent"
+              strokeDasharray={`${dashGestor} ${CIRC}`}
+              strokeDashoffset={-dashApp}
+              strokeLinecap="round"
+            />
+          </G>
+        </Svg>
+        <View style={[donut.center, { position: 'absolute' }]}>
           <Text style={donut.centerPct}>{pctGestor}%</Text>
           <Text style={donut.centerLabel}>Gestor</Text>
         </View>

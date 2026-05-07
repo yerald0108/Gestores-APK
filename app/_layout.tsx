@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { getDatabase } from '@/database/db';
+import { ToastProvider } from '@/components/ui/Toast';
 
 export default function RootLayout() {
   useEffect(() => {
@@ -11,14 +12,16 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar style="light" backgroundColor="#0A0E1A" />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: '#0A0E1A' },
-          animation: 'fade_from_bottom',
-        }}
-      />
+      <ToastProvider>
+        <StatusBar style="light" backgroundColor="#0A0E1A" />
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: '#0A0E1A' },
+            animation: 'fade_from_bottom',
+          }}
+        />
+      </ToastProvider>
     </SafeAreaProvider>
   );
 }

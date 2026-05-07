@@ -1,7 +1,7 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
-  ActivityIndicator, Alert
+  ActivityIndicator, Alert, TextInput, RefreshControl, Animated, Pressable
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, FONT, RADIUS, TRANSPORT_CONFIG } from '@/constants/theme';
 import { reservationsRepository } from '@/database/reservationsRepository';
 import { Reservation, calcFinancials } from '@/types';
+import Skeleton from '@/components/ui/Skeleton';
 
 function formatDate(dateStr: string) {
   const d = new Date(dateStr);
@@ -37,19 +38,30 @@ const fr = StyleSheet.create({
 });
 
 // ── Tarjeta de reserva ───────────────────────────────────────────────────────
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
 function ReservationCard({ item, onDelete }: {
   item: Reservation;
   onDelete: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const tc = TRANSPORT_CONFIG[item.transport];
+  const tc = TRANSPORT_CONFIG[item.transport as keyof typeof TRANSPORT_CONFIG];
   const fin = calcFinancials(item);
 
   const gananciaColor = fin.ganancia >= 0 ? COLORS.accent.success : COLORS.accent.danger;
   const gananciaIcon = fin.ganancia >= 0 ? 'trending-up' : 'trending-down';
 
+  const scale = useRef(new Animated.Value(1)).current;
+  const handlePressIn = () => Animated.spring(scale, { toValue: 0.98, useNativeDriver: true, damping: 20, stiffness: 300 }).start();
+  const handlePressOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, damping: 20, stiffness: 300 }).start();
+
   return (
-    <View style={[card.container, { borderColor: tc.color + '33' }]}>
+    <AnimatedPressable
+      style={[card.container, { borderColor: tc.color + '33', transform: [{ scale }] }]}
+      onPress={() => setExpanded(!expanded)}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+    >
       {/* ── Top: transporte + estado ── */}
       <View style={card.topRow}>
         <View style={[card.transportBadge, { backgroundColor: tc.color + '1A' }]}>
@@ -131,10 +143,10 @@ function ReservationCard({ item, onDelete }: {
       )}
 
       {/* ── Expandible: detalles ── */}
-      <TouchableOpacity style={card.expandBtn} onPress={() => setExpanded(!expanded)} activeOpacity={0.7}>
+      <View style={card.expandBtn}>
         <Text style={card.expandText}>{expanded ? 'Ocultar detalles' : 'Ver análisis completo'}</Text>
         <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={COLORS.text.muted} />
-      </TouchableOpacity>
+      </View>
 
       {expanded && (
         <View style={card.details}>
@@ -221,7 +233,7 @@ function ReservationCard({ item, onDelete }: {
           <Text style={card.deleteText}>Eliminar reserva</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </AnimatedPressable>
   );
 }
 
@@ -287,20 +299,35 @@ const card = StyleSheet.create({
 export default function ClientsScreen() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [search, setSearch] = useState('');
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (isRefresh = false) => {
     try {
-      setLoading(true);
+      if (isRefresh) setRefreshing(true);
+      else setLoading(true);
       const data = await reservationsRepository.getReserved();
       setReservations(data);
     } catch {
       Alert.alert('Error', 'No se pudieron cargar las reservas');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const filteredReservations = useMemo(() => {
+    if (!search.trim()) return reservations;
+    const lower = search.toLowerCase();
+    return reservations.filter(r => 
+      r.origin.toLowerCase().includes(lower) ||
+      r.destination.toLowerCase().includes(lower) ||
+      r.phone.includes(lower) ||
+      r.passengers?.some(p => p.full_name.toLowerCase().includes(lower))
+    );
+  }, [reservations, search]);
 
   // Totales globales
   const totals = reservations.reduce((acc, r) => {
@@ -333,6 +360,27 @@ export default function ClientsScreen() {
           <Text style={s.subtitle}>{reservations.length} reserva{reservations.length !== 1 ? 's' : ''} confirmada{reservations.length !== 1 ? 's' : ''}</Text>
         </View>
       </View>
+
+      {/* Buscador */}
+      {reservations.length > 0 && (
+        <View style={s.searchContainer}>
+          <View style={s.searchBar}>
+            <Ionicons name="search" size={20} color={COLORS.text.muted} />
+            <TextInput
+              style={s.searchInput}
+              placeholder="Buscar por origen, destino, cliente..."
+              value={search}
+              onChangeText={setSearch}
+              placeholderTextColor={COLORS.text.muted}
+            />
+            {search.length > 0 && (
+              <TouchableOpacity onPress={() => setSearch('')}>
+                <Ionicons name="close-circle" size={20} color={COLORS.text.muted} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      )}
 
       {/* Resumen global — solo si hay reservas */}
       {!loading && reservations.length > 0 && (
@@ -371,8 +419,10 @@ export default function ClientsScreen() {
       )}
 
       {loading ? (
-        <View style={s.centered}>
-          <ActivityIndicator color={COLORS.accent.success} size="large" />
+        <View style={s.list}>
+          {[1, 2, 3, 4, 5].map(key => (
+            <Skeleton key={key} height={130} borderRadius={RADIUS.xl} style={{ marginBottom: SPACING.md }} />
+          ))}
         </View>
       ) : reservations.length === 0 ? (
         <View style={s.centered}>
@@ -388,12 +438,23 @@ export default function ClientsScreen() {
             <Text style={s.emptyBtnText}>Ir a Pedidos</Text>
           </TouchableOpacity>
         </View>
+      ) : filteredReservations.length === 0 ? (
+        <View style={s.centered}>
+          <View style={s.emptyIcon}>
+            <Ionicons name="search" size={48} color={COLORS.accent.success} />
+          </View>
+          <Text style={s.emptyTitle}>No hay resultados</Text>
+          <Text style={s.emptyText}>No se encontraron reservas que coincidan con "{search}"</Text>
+        </View>
       ) : (
         <FlatList
-          data={reservations}
+          data={filteredReservations}
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={s.list}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={COLORS.accent.success} />
+          }
           renderItem={({ item }) => (
             <ReservationCard
               item={item}
@@ -413,7 +474,10 @@ const s = StyleSheet.create({
   headerInfo: { flex: 1 },
   title: { fontSize: FONT.sizes.xl, color: COLORS.text.primary, fontWeight: FONT.weights.bold },
   subtitle: { fontSize: FONT.sizes.xs, color: COLORS.text.muted, marginTop: 2 },
-  summaryStrip: { flexDirection: 'row', gap: SPACING.sm, paddingHorizontal: SPACING.lg, marginBottom: SPACING.md },
+  searchContainer: { paddingHorizontal: SPACING.lg, paddingBottom: SPACING.sm },
+  searchBar: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, backgroundColor: COLORS.bg.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.border.default, paddingHorizontal: SPACING.md, paddingVertical: SPACING.xs },
+  searchInput: { flex: 1, fontSize: FONT.sizes.md, color: COLORS.text.primary, paddingVertical: 8 },
+  summaryStrip: { flexDirection: 'row', paddingHorizontal: SPACING.lg, gap: SPACING.sm, marginBottom: SPACING.sm },
   summaryItem: { flex: 1, flexDirection: 'column', alignItems: 'center', backgroundColor: COLORS.bg.card, borderRadius: RADIUS.lg, paddingVertical: SPACING.sm + 2, paddingHorizontal: SPACING.xs, borderWidth: 1, gap: 2 },
   summaryIconWrap: { width: 30, height: 30, borderRadius: RADIUS.full, justifyContent: 'center', alignItems: 'center', marginBottom: 2 },
   summaryLabel: { fontSize: 9, color: COLORS.text.muted, textAlign: 'center', letterSpacing: 0.3 },

@@ -1,9 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
-  Modal, FlatList, TextInput,
+  Modal, FlatList, TextInput, Keyboard, LayoutAnimation, UIManager
 } from 'react-native';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,15 +19,30 @@ import { reservationsRepository } from '@/database/reservationsRepository';
 import { getDatabase } from '@/database/db';
 import { Route, TransportType, Passenger } from '@/types';
 import PaymentMethodSelector, { PaymentSelection } from '@/components/PaymentMethodSelector';
-import { BANK_CONFIG } from '@/services/userProfileService';
+import { BANK_CONFIG, userProfileService } from '@/services/userProfileService';
+import { useGlobalToast } from '@/components/ui/Toast';
+import AnimatedSwitch from '@/components/ui/AnimatedSwitch';
 
 // ── Modal selector genérico ─────────────────────────────────────────────────
-function ListSelectorModal<T>({ visible, title, subtitle, items, selected, renderItem, keyExtractor, onClose }: {
+function ListSelectorModal<T>({ visible, title, subtitle, items, selected, renderItem, keyExtractor, onClose, searchable, searchExtract }: {
   visible: boolean; title: string; subtitle?: string;
   items: T[]; selected?: string; keyExtractor: (item: T) => string;
   renderItem: (item: T, isSelected: boolean, onPress: () => void) => React.ReactElement;
   onClose: () => void;
+  searchable?: boolean;
+  searchExtract?: (item: T) => string;
 }) {
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    if (!visible) setSearch('');
+  }, [visible]);
+
+  const filteredItems = React.useMemo(() => {
+    if (!searchable || !search.trim() || !searchExtract) return items;
+    const lower = search.toLowerCase();
+    return items.filter(item => searchExtract(item).toLowerCase().includes(lower));
+  }, [items, search, searchable, searchExtract]);
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={ms.overlay}>
@@ -38,8 +57,25 @@ function ListSelectorModal<T>({ visible, title, subtitle, items, selected, rende
               <Ionicons name="close" size={20} color={COLORS.text.secondary} />
             </TouchableOpacity>
           </View>
+          {searchable && (
+            <View style={ms.searchContainer}>
+              <Ionicons name="search" size={18} color={COLORS.text.muted} />
+              <TextInput
+                style={ms.searchInput}
+                placeholder="Buscar..."
+                placeholderTextColor={COLORS.text.muted}
+                value={search}
+                onChangeText={setSearch}
+              />
+              {search.length > 0 && (
+                <TouchableOpacity onPress={() => setSearch('')}>
+                  <Ionicons name="close-circle" size={18} color={COLORS.text.muted} />
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
           <FlatList
-            data={items}
+            data={filteredItems}
             keyExtractor={keyExtractor}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={ms.list}
@@ -62,6 +98,8 @@ const ms = StyleSheet.create({
   title: { fontSize: FONT.sizes.lg, color: COLORS.text.primary, fontWeight: FONT.weights.bold },
   subtitle: { fontSize: FONT.sizes.sm, color: COLORS.text.muted, marginTop: 2 },
   closeBtn: { width: 36, height: 36, borderRadius: RADIUS.full, backgroundColor: COLORS.bg.elevated, justifyContent: 'center', alignItems: 'center' },
+  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.bg.elevated, marginHorizontal: SPACING.lg, marginBottom: SPACING.md, borderRadius: RADIUS.lg, paddingHorizontal: SPACING.md, paddingVertical: SPACING.xs, gap: SPACING.sm },
+  searchInput: { flex: 1, color: COLORS.text.primary, fontSize: FONT.sizes.md, paddingVertical: 8 },
   list: { paddingHorizontal: SPACING.lg, paddingBottom: SPACING.lg, gap: SPACING.xs },
 });
 
@@ -170,6 +208,9 @@ const sh = StyleSheet.create({
 export default function AddReservationScreen() {
   const { editId } = useLocalSearchParams<{ editId?: string }>();
   const isEditing = !!editId;
+  const toast = useGlobalToast();
+
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const [phone, setPhone] = useState('');
   const [transport, setTransport] = useState<TransportType | ''>('');
@@ -232,8 +273,7 @@ export default function AddReservationScreen() {
         // Cargar método de pago si existe
         if (r.payment_method) {
           // Reconstruimos la selección mínima para mostrar el badge
-          const { userProfileService: ups } = require('@/services/userProfileService');
-          ups.get().then((profile: any) => {
+          userProfileService.get().then((profile: any) => {
             const card = profile.cards.find((c: any) => c.bank === r.payment_method);
             if (card) {
               setPaymentSelection({ card, confirmNumber: r.payment_confirm_number });
@@ -398,10 +438,17 @@ export default function AddReservationScreen() {
           passengers,
         });
       }
-      router.back();
+      toast.show({
+        message: isEditing ? 'Cambios guardados' : 'Pedido guardado',
+        type: 'success',
+      });
+      setTimeout(() => router.back(), 800);
     } catch (e) {
       console.error(e);
-      Alert.alert('Error', 'No se pudo guardar el pedido');
+      toast.show({
+        message: 'No se pudo guardar el pedido',
+        type: 'error',
+      });
     } finally {
       setLoading(false);
     }
@@ -412,7 +459,11 @@ export default function AddReservationScreen() {
 
   return (
     <SafeAreaView style={s.container}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+      >
         {/* Header */}
         <View style={s.header}>
           <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
@@ -424,7 +475,12 @@ export default function AddReservationScreen() {
           </View>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.content}>
+        <ScrollView
+          ref={scrollViewRef}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={s.content}
+          keyboardShouldPersistTaps="handled"
+        >
 
           {/* ── Contacto ── */}
           <SectionHeader icon="call" label="Contacto" color={accentColor} />
@@ -600,7 +656,10 @@ export default function AddReservationScreen() {
                     backgroundColor: isReserved ? COLORS.accent.success + '0D' : COLORS.bg.input,
                   }
                 ]}
-                onPress={() => handleToggleReserved(!isReserved)}
+                onPress={() => {
+                  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                  setIsReserved(!isReserved);
+                }}
                 activeOpacity={0.7}
               >
                 <View style={[s.inputIcon, { backgroundColor: isReserved ? COLORS.accent.success + '22' : COLORS.bg.elevated }]}>
@@ -618,9 +677,7 @@ export default function AddReservationScreen() {
                     {isReserved ? 'Este pedido pasará a ser una reserva' : 'Toca para marcar como reservado'}
                   </Text>
                 </View>
-                <View style={[s.toggle, { backgroundColor: isReserved ? COLORS.accent.success : COLORS.bg.elevated }]}>
-                  <View style={[s.toggleThumb, { transform: [{ translateX: isReserved ? 18 : 2 }] }]} />
-                </View>
+                <AnimatedSwitch value={isReserved} color={COLORS.accent.success} />
               </TouchableOpacity>
 
               {/* ── Bloque gestor (aparece cuando isReserved = true) ── */}
@@ -795,7 +852,19 @@ export default function AddReservationScreen() {
 
           <TouchableOpacity
             style={[s.toggleRow, { borderColor: advanceEnabled ? accentColor + '55' : COLORS.border.default }]}
-            onPress={() => { setAdvanceEnabled(!advanceEnabled); if (advanceEnabled) setAdvance(''); }}
+            onPress={() => {
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              const nextEnabled = !advanceEnabled;
+              setAdvanceEnabled(nextEnabled);
+              if (!nextEnabled) {
+                setAdvance('');
+                Keyboard.dismiss();
+              } else {
+                // Espera a que el campo se renderice y el teclado aparezca,
+                // luego hace scroll hasta el final para que el input quede visible
+                setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 350);
+              }
+            }}
             activeOpacity={0.7}
           >
             <View style={[s.inputIcon, { backgroundColor: accentColor + '1A' }]}>
@@ -803,9 +872,7 @@ export default function AddReservationScreen() {
             </View>
             <Text style={s.toggleLabel}>Anticipo</Text>
             <Text style={s.toggleHint}>Opcional</Text>
-            <View style={[s.toggle, { backgroundColor: advanceEnabled ? accentColor : COLORS.bg.elevated }]}>
-              <View style={[s.toggleThumb, { transform: [{ translateX: advanceEnabled ? 18 : 2 }] }]} />
-            </View>
+            <AnimatedSwitch value={advanceEnabled} color={accentColor} />
           </TouchableOpacity>
 
           {advanceEnabled && (
@@ -929,6 +996,8 @@ export default function AddReservationScreen() {
         items={availableOrigins}
         selected={origin}
         keyExtractor={(p) => p}
+        searchable={true}
+        searchExtract={(p) => p}
         onClose={() => setShowOriginModal(false)}
         renderItem={(item, isSel, close) => (
           <TouchableOpacity
@@ -949,6 +1018,8 @@ export default function AddReservationScreen() {
         items={availableDestinations}
         selected={destination}
         keyExtractor={(p) => p}
+        searchable={true}
+        searchExtract={(p) => p}
         onClose={() => setShowDestModal(false)}
         renderItem={(item, isSel, close) => (
           <TouchableOpacity

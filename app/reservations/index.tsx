@@ -1,7 +1,8 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
-  ActivityIndicator, Alert, Linking
+  ActivityIndicator, Alert, Linking, TextInput, RefreshControl,
+  Animated, Pressable
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -10,19 +11,108 @@ import { COLORS, SPACING, FONT, RADIUS, TRANSPORT_CONFIG } from '@/constants/the
 import { reservationsRepository } from '@/database/reservationsRepository';
 import { BANK_CONFIG } from '@/services/userProfileService';
 import { Reservation } from '@/types';
+import Skeleton from '@/components/ui/Skeleton';
 
 function formatDate(dateStr: string) {
   const d = new Date(dateStr);
   return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+function ReservationCard({ item, onPress, onEdit, onWhatsApp, onDelete }: any) {
+  const tc = TRANSPORT_CONFIG[item.transport as keyof typeof TRANSPORT_CONFIG];
+  const passengerCount = item.passengers?.length ?? 0;
+  
+  const scale = useRef(new Animated.Value(1)).current;
+  
+  const handlePressIn = () => {
+    Animated.spring(scale, { toValue: 0.97, useNativeDriver: true, damping: 20, stiffness: 300 }).start();
+  };
+  
+  const handlePressOut = () => {
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true, damping: 20, stiffness: 300 }).start();
+  };
+
+  return (
+    <AnimatedPressable
+      style={[s.card, { transform: [{ scale }] }]}
+      onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+    >
+      <View style={s.cardTop}>
+        <View style={[s.transportBadge, { backgroundColor: tc.color + '1A' }]}>
+          <Ionicons name={tc.icon as any} size={14} color={tc.color} />
+          <Text style={[s.transportLabel, { color: tc.color }]}>{tc.label}</Text>
+        </View>
+        <View style={[s.statusBadge, { backgroundColor: COLORS.accent.warning + '1A' }]}>
+          <View style={[s.statusDot, { backgroundColor: COLORS.accent.warning }]} />
+          <Text style={[s.statusText, { color: COLORS.accent.warning }]}>Pendiente</Text>
+        </View>
+      </View>
+
+      <View style={s.routeRow}>
+        <Text style={s.cityText} numberOfLines={1}>{item.origin}</Text>
+        <View style={s.routeArrow}>
+          <View style={[s.routeLine, { backgroundColor: tc.color + '44' }]} />
+          <Ionicons name="airplane" size={12} color={tc.color} />
+          <View style={[s.routeLine, { backgroundColor: tc.color + '44' }]} />
+        </View>
+        <Text style={s.cityText} numberOfLines={1}>{item.destination}</Text>
+      </View>
+
+      <View style={s.infoRow}>
+        <View style={s.infoItem}>
+          <Ionicons name="people-outline" size={13} color={COLORS.text.muted} />
+          <Text style={s.infoText}>{passengerCount} pasajero{passengerCount !== 1 ? 's' : ''}</Text>
+        </View>
+        <View style={s.infoItem}>
+          <Ionicons name="calendar-outline" size={13} color={COLORS.text.muted} />
+          <Text style={s.infoText}>{formatDate(item.travel_date)}</Text>
+        </View>
+        <View style={s.infoItem}>
+          <Ionicons name="call-outline" size={13} color={COLORS.text.muted} />
+          <Text style={s.infoText}>{item.phone}</Text>
+        </View>
+      </View>
+
+      <View style={s.cardBottom}>
+        <View style={s.totalSection}>
+          <Text style={s.totalLabel}>Total a pagar</Text>
+          <Text style={[s.totalAmount, { color: COLORS.accent.success }]}>
+            {item.total.toFixed(2)} CUP
+          </Text>
+        </View>
+
+        <View style={s.actionsGroup}>
+          <TouchableOpacity style={s.actionBtn} onPress={onEdit}>
+            <Ionicons name="pencil" size={16} color={COLORS.accent.primary} />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[s.actionBtn, s.whatsappBtn]} onPress={onWhatsApp}>
+            <Ionicons name="logo-whatsapp" size={18} color="#25D366" />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[s.actionBtn, s.deleteBtn]} onPress={onDelete}>
+            <Ionicons name="trash-outline" size={16} color={COLORS.accent.danger} />
+          </TouchableOpacity>
+        </View>
+      </View>
+    </AnimatedPressable>
+  );
+}
+
 export default function ReservationsScreen() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [search, setSearch] = useState('');
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (isRefresh = false) => {
     try {
-      setLoading(true);
+      if (isRefresh) setRefreshing(true);
+      else setLoading(true);
       // Solo carga los pedidos pendientes — los reservados van a /clients
       const data = await reservationsRepository.getPending();
       setReservations(data);
@@ -30,10 +120,22 @@ export default function ReservationsScreen() {
       Alert.alert('Error', 'No se pudieron cargar los pedidos');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const filteredReservations = useMemo(() => {
+    if (!search.trim()) return reservations;
+    const lower = search.toLowerCase();
+    return reservations.filter(r => 
+      r.origin.toLowerCase().includes(lower) ||
+      r.destination.toLowerCase().includes(lower) ||
+      r.phone.includes(lower) ||
+      r.passengers?.some(p => p.full_name.toLowerCase().includes(lower))
+    );
+  }, [reservations, search]);
 
   const handleDelete = (r: Reservation) => {
     Alert.alert('Eliminar pedido', `¿Eliminar el pedido #${r.id}?`, [
@@ -105,9 +207,32 @@ export default function ReservationsScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Barra de búsqueda */}
+      {reservations.length > 0 && (
+        <View style={s.searchContainer}>
+          <View style={s.searchBar}>
+            <Ionicons name="search" size={20} color={COLORS.text.muted} />
+            <TextInput
+              style={s.searchInput}
+              placeholder="Buscar nombre, teléfono o ruta..."
+              placeholderTextColor={COLORS.text.muted}
+              value={search}
+              onChangeText={setSearch}
+            />
+            {search.length > 0 && (
+              <TouchableOpacity onPress={() => setSearch('')}>
+                <Ionicons name="close-circle" size={20} color={COLORS.text.muted} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      )}
+
       {loading ? (
-        <View style={s.centered}>
-          <ActivityIndicator color={COLORS.accent.primary} size="large" />
+        <View style={s.list}>
+          {[1, 2, 3, 4, 5].map(key => (
+            <Skeleton key={key} height={110} borderRadius={RADIUS.xl} style={{ marginBottom: SPACING.md }} />
+          ))}
         </View>
       ) : reservations.length === 0 ? (
         <View style={s.centered}>
@@ -121,98 +246,32 @@ export default function ReservationsScreen() {
             <Text style={s.emptyBtnText}>Nuevo pedido</Text>
           </TouchableOpacity>
         </View>
+      ) : filteredReservations.length === 0 ? (
+        <View style={s.centered}>
+          <View style={s.emptyIcon}>
+            <Ionicons name="search" size={48} color={COLORS.accent.primary} />
+          </View>
+          <Text style={s.emptyTitle}>No hay resultados</Text>
+          <Text style={s.emptyText}>No se encontraron pedidos que coincidan con "{search}"</Text>
+        </View>
       ) : (
         <FlatList
-          data={reservations}
+          data={filteredReservations}
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={s.list}
           showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => {
-            const tc = TRANSPORT_CONFIG[item.transport];
-            const passengerCount = item.passengers?.length ?? 0;
-            return (
-              <TouchableOpacity
-                style={s.card}
-                onPress={() => router.push({ pathname: '/reservations/detail', params: { id: item.id.toString() } } as any)}
-                activeOpacity={0.75}
-              >
-                {/* Top row */}
-                <View style={s.cardTop}>
-                  <View style={[s.transportBadge, { backgroundColor: tc.color + '1A' }]}>
-                    <Ionicons name={tc.icon as any} size={14} color={tc.color} />
-                    <Text style={[s.transportLabel, { color: tc.color }]}>{tc.label}</Text>
-                  </View>
-                  <View style={[s.statusBadge, { backgroundColor: COLORS.accent.warning + '1A' }]}>
-                    <View style={[s.statusDot, { backgroundColor: COLORS.accent.warning }]} />
-                    <Text style={[s.statusText, { color: COLORS.accent.warning }]}>Pendiente</Text>
-                  </View>
-                </View>
-
-                {/* Route */}
-                <View style={s.routeRow}>
-                  <Text style={s.cityText} numberOfLines={1}>{item.origin}</Text>
-                  <View style={s.routeArrow}>
-                    <View style={[s.routeLine, { backgroundColor: tc.color + '44' }]} />
-                    <Ionicons name="airplane" size={12} color={tc.color} />
-                    <View style={[s.routeLine, { backgroundColor: tc.color + '44' }]} />
-                  </View>
-                  <Text style={s.cityText} numberOfLines={1}>{item.destination}</Text>
-                </View>
-
-                {/* Info row */}
-                <View style={s.infoRow}>
-                  <View style={s.infoItem}>
-                    <Ionicons name="people-outline" size={13} color={COLORS.text.muted} />
-                    <Text style={s.infoText}>{passengerCount} pasajero{passengerCount !== 1 ? 's' : ''}</Text>
-                  </View>
-                  <View style={s.infoItem}>
-                    <Ionicons name="calendar-outline" size={13} color={COLORS.text.muted} />
-                    <Text style={s.infoText}>{formatDate(item.travel_date)}</Text>
-                  </View>
-                  <View style={s.infoItem}>
-                    <Ionicons name="call-outline" size={13} color={COLORS.text.muted} />
-                    <Text style={s.infoText}>{item.phone}</Text>
-                  </View>
-                </View>
-
-                {/* Bottom */}
-                <View style={s.cardBottom}>
-                  <View style={s.totalSection}>
-                    <Text style={s.totalLabel}>Total a pagar</Text>
-                    <Text style={[s.totalAmount, { color: COLORS.accent.success }]}>
-                      {item.total.toFixed(2)} CUP
-                    </Text>
-                  </View>
-
-                  <View style={s.actionsGroup}>
-                    <TouchableOpacity
-                      style={s.actionBtn}
-                      onPress={() => router.push({
-                        pathname: '/reservations/add',
-                        params: { editId: item.id.toString() }
-                      } as any)}
-                    >
-                      <Ionicons name="pencil" size={16} color={COLORS.accent.primary} />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[s.actionBtn, s.whatsappBtn]}
-                      onPress={() => handleWhatsApp(item)}
-                    >
-                      <Ionicons name="logo-whatsapp" size={18} color="#25D366" />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[s.actionBtn, s.deleteBtn]}
-                      onPress={() => handleDelete(item)}
-                    >
-                      <Ionicons name="trash-outline" size={16} color={COLORS.accent.danger} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            );
-          }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={COLORS.accent.primary} />
+          }
+          renderItem={({ item }) => (
+            <ReservationCard
+              item={item}
+              onPress={() => router.push({ pathname: '/reservations/detail', params: { id: item.id.toString() } } as any)}
+              onEdit={() => router.push({ pathname: '/reservations/add', params: { editId: item.id.toString() } } as any)}
+              onWhatsApp={() => handleWhatsApp(item)}
+              onDelete={() => handleDelete(item)}
+            />
+          )}
         />
       )}
     </SafeAreaView>
@@ -227,6 +286,9 @@ const s = StyleSheet.create({
   title: { fontSize: FONT.sizes.xl, color: COLORS.text.primary, fontWeight: FONT.weights.bold },
   subtitle: { fontSize: FONT.sizes.xs, color: COLORS.text.muted, marginTop: 2 },
   addBtn: { width: 44, height: 44, borderRadius: RADIUS.full, backgroundColor: COLORS.accent.primary, justifyContent: 'center', alignItems: 'center' },
+  searchContainer: { paddingHorizontal: SPACING.lg, paddingBottom: SPACING.sm },
+  searchBar: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, backgroundColor: COLORS.bg.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.border.default, paddingHorizontal: SPACING.md, paddingVertical: SPACING.xs },
+  searchInput: { flex: 1, fontSize: FONT.sizes.md, color: COLORS.text.primary, paddingVertical: 8 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: SPACING.md, padding: SPACING.xl },
   emptyIcon: { width: 96, height: 96, borderRadius: RADIUS.xl, backgroundColor: COLORS.accent.primary + '1A', justifyContent: 'center', alignItems: 'center' },
   emptyTitle: { fontSize: FONT.sizes.xl, color: COLORS.text.primary, fontWeight: FONT.weights.bold },

@@ -8,6 +8,7 @@ import { COLORS, SPACING, FONT, RADIUS } from '@/constants/theme';
 import {
   userProfileService, UserProfile, BankCard, BankType, BANK_CONFIG,
 } from '@/services/userProfileService';
+import { useGlobalToast } from '@/components/ui/Toast';
 
 // ── Selector de banco ──────────────────────────────────────────────────────
 function BankSelector({ selected, onSelect }: {
@@ -158,6 +159,7 @@ export default function UserProfileModal({ visible, onClose }: Props) {
   const [phone, setPhone] = useState('');
   const [showAddCard, setShowAddCard] = useState(false);
   const [saving, setSaving] = useState(false);
+  const toast = useGlobalToast();
 
   useEffect(() => {
     if (visible) {
@@ -174,7 +176,10 @@ export default function UserProfileModal({ visible, onClose }: Props) {
     const updated = await userProfileService.updateProfile(name.trim(), phone.trim());
     setProfile(updated);
     setSaving(false);
-    Alert.alert('Guardado', 'Perfil actualizado correctamente');
+    toast.show({
+      message: 'Perfil actualizado correctamente',
+      type: 'success',
+    });
   };
 
   const handleAddCard = async (card: Omit<BankCard, 'id'>) => {

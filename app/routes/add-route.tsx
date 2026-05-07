@@ -17,7 +17,20 @@ function ProvinceSelectorModal({ visible, title, selected, excluded, color, tran
   excluded?: string; color: string; transport: TransportType;
   onSelect: (p: string) => void; onClose: () => void;
 }) {
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    if (!visible) setSearch('');
+  }, [visible]);
+
   const available = getProvincesForTransport(transport).filter((p) => p !== excluded);
+
+  const filteredItems = React.useMemo(() => {
+    if (!search.trim()) return available;
+    const lower = search.toLowerCase();
+    return available.filter(item => item.toLowerCase().includes(lower));
+  }, [available, search]);
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={ms.overlay}>
@@ -30,8 +43,23 @@ function ProvinceSelectorModal({ visible, title, selected, excluded, color, tran
             </TouchableOpacity>
           </View>
           <Text style={ms.subtitle}>Selecciona una localidad</Text>
+          <View style={ms.searchContainer}>
+            <Ionicons name="search" size={18} color={COLORS.text.muted} />
+            <TextInput
+              style={ms.searchInput}
+              placeholder="Buscar..."
+              placeholderTextColor={COLORS.text.muted}
+              value={search}
+              onChangeText={setSearch}
+            />
+            {search.length > 0 && (
+              <TouchableOpacity onPress={() => setSearch('')}>
+                <Ionicons name="close-circle" size={18} color={COLORS.text.muted} />
+              </TouchableOpacity>
+            )}
+          </View>
           <FlatList
-            data={available}
+            data={filteredItems}
             keyExtractor={(item) => item}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={ms.list}
@@ -68,6 +96,8 @@ const ms = StyleSheet.create({
   title: { fontSize: FONT.sizes.lg, color: COLORS.text.primary, fontWeight: FONT.weights.bold },
   closeBtn: { width: 36, height: 36, borderRadius: RADIUS.full, backgroundColor: COLORS.bg.elevated, justifyContent: 'center', alignItems: 'center' },
   subtitle: { fontSize: FONT.sizes.sm, color: COLORS.text.muted, paddingHorizontal: SPACING.lg, marginTop: 4, marginBottom: SPACING.md },
+  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.bg.elevated, marginHorizontal: SPACING.lg, marginBottom: SPACING.md, borderRadius: RADIUS.lg, paddingHorizontal: SPACING.md, paddingVertical: SPACING.xs, gap: SPACING.sm },
+  searchInput: { flex: 1, color: COLORS.text.primary, fontSize: FONT.sizes.md, paddingVertical: 8 },
   list: { paddingHorizontal: SPACING.lg, paddingBottom: SPACING.lg, gap: SPACING.xs },
   item: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, paddingVertical: SPACING.sm + 2, paddingHorizontal: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.border.default, backgroundColor: COLORS.bg.card },
   dot: { width: 24, height: 24, borderRadius: RADIUS.full, justifyContent: 'center', alignItems: 'center' },
