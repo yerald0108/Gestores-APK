@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal,
-  TextInput, ScrollView, Alert, KeyboardAvoidingView, Platform,
+  TextInput, ScrollView, Alert, KeyboardAvoidingView, Platform, Animated, PanResponder,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, FONT, RADIUS } from '@/constants/theme';
@@ -176,6 +176,63 @@ export default function UserProfileModal({ visible, onClose }: Props) {
   const [saving, setSaving] = useState(false);
   const toast = useGlobalToast();
 
+  const [show, setShow] = useState(visible);
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const slideAnim = React.useRef(new Animated.Value(500)).current;
+
+  // PanResponder para el gesto de deslizar hacia abajo
+  const panResponder = React.useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_: any, gestureState: any) => {
+        return gestureState.dy > 5;
+      },
+      onPanResponderMove: (_: any, gestureState: any) => {
+        if (gestureState.dy > 0) {
+          slideAnim.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (_: any, gestureState: any) => {
+        if (gestureState.dy > 120 || gestureState.vy > 0.5) {
+          closeModal();
+        } else {
+          Animated.spring(slideAnim, {
+            toValue: 0,
+            useNativeDriver: true,
+            bounciness: 5,
+          }).start();
+        }
+      },
+    })
+  ).current;
+
+  const closeModal = () => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 500, duration: 250, useNativeDriver: true }),
+    ]).start(() => {
+      setShow(false);
+      onClose();
+    });
+  };
+
+  useEffect(() => {
+    if (visible) {
+      setShow(true);
+      Animated.parallel([
+        Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(slideAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
+      ]).start();
+    } else {
+      if (show) {
+        Animated.parallel([
+          Animated.timing(fadeAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
+          Animated.timing(slideAnim, { toValue: 500, duration: 250, useNativeDriver: true }),
+        ]).start(() => setShow(false));
+      }
+    }
+  }, [visible]);
+
   useEffect(() => {
     if (visible) {
       userProfileService.get().then((p) => {
@@ -202,11 +259,9 @@ export default function UserProfileModal({ visible, onClose }: Props) {
     let updated;
     if (editingCard) {
       updated = await userProfileService.editCard(editingCard.id, card);
-      onClose();
       toast.show({ message: 'Tarjeta actualizada', type: 'success' });
     } else {
       updated = await userProfileService.addCard(card);
-      onClose();
       toast.show({ message: 'Tarjeta añadida', type: 'success' });
     }
     setProfile(updated);
@@ -222,39 +277,48 @@ export default function UserProfileModal({ visible, onClose }: Props) {
         onPress: async () => {
           const updated = await userProfileService.removeCard(cardId);
           setProfile(updated);
-          onClose();
           toast.show({ message: 'Tarjeta eliminada', type: 'success' });
         },
       },
     ]);
   };
 
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={m.overlay}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={{ width: '100%' }}
-        >
-          <View style={m.sheet}>
-            {/* Handle */}
-            <View style={m.handle} />
+  if (!show) return null;
 
-            {/* Header */}
-            <View style={m.header}>
-              <View style={[m.avatar, { backgroundColor: COLORS.accent.primary + '1A' }]}>
-                <Ionicons name="person" size={22} color={COLORS.accent.primary} />
+  return (
+    <Modal visible={show} transparent animationType="none" onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        <Animated.View style={[m.overlay, { opacity: fadeAnim }]}>
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={closeModal} />
+          <Animated.View 
+            style={[
+              m.sheet, 
+              { transform: [{ translateY: slideAnim }] }
+            ]}
+          >
+            {/* Area de arrastre */}
+            <View {...panResponder.panHandlers} style={m.dragArea}>
+              <View style={m.handle} />
+
+              {/* Header */}
+              <View style={m.header}>
+                <View style={[m.avatar, { backgroundColor: COLORS.accent.primary + '1A' }]}>
+                  <Ionicons name="person" size={22} color={COLORS.accent.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={m.title}>Mi perfil</Text>
+                  <Text style={m.subtitle}>Configuración del gestor</Text>
+                </View>
+                <TouchableOpacity style={m.closeBtn} onPress={closeModal}>
+                  <Ionicons name="close" size={20} color={COLORS.text.secondary} />
+                </TouchableOpacity>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={m.title}>Mi perfil</Text>
-                <Text style={m.subtitle}>Configuración del gestor</Text>
-              </View>
-              <TouchableOpacity style={m.closeBtn} onPress={onClose}>
-                <Ionicons name="close" size={20} color={COLORS.text.secondary} />
-              </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={m.content}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={m.content} keyboardShouldPersistTaps="handled">
 
               {/* ── Datos personales ── */}
               <Text style={m.sectionTitle}>Datos personales</Text>
@@ -346,18 +410,19 @@ export default function UserProfileModal({ visible, onClose }: Props) {
               )}
 
             </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
-      </View>
+          </Animated.View>
+        </Animated.View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const m = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheet: { backgroundColor: COLORS.bg.secondary, borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '90%' },
-  handle: { width: 40, height: 4, backgroundColor: COLORS.border.default, borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 4 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md, borderBottomWidth: 1, borderBottomColor: COLORS.border.default },
+  dragArea: { width: '100%', paddingTop: 4 },
+  handle: { width: 40, height: 4, backgroundColor: COLORS.border.default, borderRadius: 2, alignSelf: 'center', marginTop: 8, marginBottom: 4 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, paddingHorizontal: SPACING.lg, paddingTop: SPACING.sm, paddingBottom: SPACING.sm, borderBottomWidth: 1, borderBottomColor: COLORS.border.default },
   avatar: { width: 44, height: 44, borderRadius: RADIUS.full, justifyContent: 'center', alignItems: 'center' },
   title: { fontSize: FONT.sizes.lg, color: COLORS.text.primary, fontWeight: FONT.weights.bold },
   subtitle: { fontSize: FONT.sizes.xs, color: COLORS.text.muted, marginTop: 1 },

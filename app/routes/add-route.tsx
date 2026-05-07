@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, 
   Alert, ActivityIndicator, KeyboardAvoidingView,
-  Platform, Modal, FlatList, TextInput,
+  Platform, Modal, FlatList, TextInput, Animated, PanResponder,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -19,6 +19,65 @@ function ProvinceSelectorModal({ visible, title, selected, excluded, color, tran
   onSelect: (p: string) => void; onClose: () => void;
 }) {
   const [search, setSearch] = useState('');
+  const [show, setShow] = useState(visible);
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const slideAnim = React.useRef(new Animated.Value(500)).current;
+
+  // PanResponder para el gesto de deslizar hacia abajo
+  const panResponder = React.useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_: any, gestureState: any) => {
+        return gestureState.dy > 5; // Solo capturar si se desliza hacia abajo
+      },
+      onPanResponderMove: (_: any, gestureState: any) => {
+        if (gestureState.dy > 0) {
+          slideAnim.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (_: any, gestureState: any) => {
+        if (gestureState.dy > 120 || gestureState.vy > 0.5) {
+          // Si el deslizamiento fue suficiente, cerrar
+          closeModal();
+        } else {
+          // Si no, volver a la posición original
+          Animated.spring(slideAnim, {
+            toValue: 0,
+            useNativeDriver: true,
+            bounciness: 5,
+          }).start();
+        }
+      },
+    })
+  ).current;
+
+  const closeModal = () => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 500, duration: 250, useNativeDriver: true }),
+    ]).start(() => {
+      setShow(false);
+      onClose();
+    });
+  };
+
+  useEffect(() => {
+    if (visible) {
+      setShow(true);
+      Animated.parallel([
+        Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(slideAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
+      ]).start();
+    } else {
+      // Solo animar si aún estamos mostrando el modal internamente
+      if (show) {
+        Animated.parallel([
+          Animated.timing(fadeAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
+          Animated.timing(slideAnim, { toValue: 500, duration: 250, useNativeDriver: true }),
+        ]).start(() => setShow(false));
+      }
+    }
+  }, [visible]);
 
   useEffect(() => {
     if (!visible) setSearch('');
@@ -32,67 +91,93 @@ function ProvinceSelectorModal({ visible, title, selected, excluded, color, tran
     return available.filter(item => item.toLowerCase().includes(lower));
   }, [available, search]);
 
+  if (!show) return null;
+
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={ms.overlay}>
-        <View style={ms.sheet}>
-          <View style={ms.handle} />
-          <View style={ms.header}>
-            <Text style={ms.title}>{title}</Text>
-            <TouchableOpacity style={ms.closeBtn} onPress={onClose}>
-              <Ionicons name="close" size={20} color={COLORS.text.secondary} />
-            </TouchableOpacity>
-          </View>
-          <Text style={ms.subtitle}>Selecciona una localidad</Text>
-          <View style={ms.searchContainer}>
-            <Ionicons name="search" size={18} color={COLORS.text.muted} />
-            <TextInput
-              style={ms.searchInput}
-              placeholder="Buscar..."
-              placeholderTextColor={COLORS.text.muted}
-              value={search}
-              onChangeText={setSearch}
-            />
-            {search.length > 0 && (
-              <TouchableOpacity onPress={() => setSearch('')}>
-                <Ionicons name="close-circle" size={18} color={COLORS.text.muted} />
-              </TouchableOpacity>
-            )}
-          </View>
-          <FlatList
-            data={filteredItems}
-            keyExtractor={(item) => item}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={ms.list}
-            renderItem={({ item }) => {
-              const sel = item === selected;
-              return (
-                <TouchableOpacity
-                  style={[ms.item, sel && { backgroundColor: color + '1A', borderColor: color }]}
-                  onPress={() => { onSelect(item); onClose(); }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[ms.dot, { backgroundColor: sel ? color : COLORS.bg.elevated }]}>
-                    {sel && <Ionicons name="checkmark" size={12} color="#fff" />}
-                  </View>
-                  <Text style={[ms.itemText, sel && { color, fontWeight: FONT.weights.semibold }]}>
-                    {item}
-                  </Text>
-                  {sel && <Ionicons name="checkmark-circle" size={18} color={color} style={{ marginLeft: 'auto' }} />}
-                </TouchableOpacity>
-              );
-            }}
+    <Modal visible={show} transparent animationType="none" onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        <Animated.View 
+          style={[ms.overlay, { opacity: fadeAnim }]}
+        >
+          <TouchableOpacity 
+            style={{ flex: 1, width: '100%' }} 
+            activeOpacity={1} 
+            onPress={onClose} 
           />
-        </View>
-      </View>
+          <Animated.View 
+            style={[
+              ms.sheet, 
+              { transform: [{ translateY: slideAnim }] }
+            ]}
+          >
+            {/* Area de arrastre (Handle + Header) */}
+            <View {...panResponder.panHandlers} style={ms.dragArea}>
+              <View style={ms.handle} />
+              <View style={ms.header}>
+                <Text style={ms.title}>{title}</Text>
+                <TouchableOpacity style={ms.closeBtn} onPress={onClose}>
+                  <Ionicons name="close" size={20} color={COLORS.text.secondary} />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <Text style={ms.subtitle}>Selecciona una localidad</Text>
+            <View style={ms.searchContainer}>
+              <Ionicons name="search" size={18} color={COLORS.text.muted} />
+              <TextInput
+                style={ms.searchInput}
+                placeholder="Buscar..."
+                placeholderTextColor={COLORS.text.muted}
+                value={search}
+                onChangeText={setSearch}
+                autoFocus={false}
+              />
+              {search.length > 0 && (
+                <TouchableOpacity onPress={() => setSearch('')}>
+                  <Ionicons name="close-circle" size={18} color={COLORS.text.muted} />
+                </TouchableOpacity>
+              )}
+            </View>
+            <FlatList
+              data={filteredItems}
+              keyExtractor={(item) => item}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={ms.list}
+              keyboardShouldPersistTaps="handled"
+              renderItem={({ item }) => {
+                const sel = item === selected;
+                return (
+                  <TouchableOpacity
+                    style={[ms.item, sel && { backgroundColor: color + '1A', borderColor: color }]}
+                    onPress={() => { onSelect(item); onClose(); }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[ms.dot, { backgroundColor: sel ? color : COLORS.bg.elevated }]}>
+                      {sel && <Ionicons name="checkmark" size={12} color="#fff" />}
+                    </View>
+                    <Text style={[ms.itemText, sel && { color, fontWeight: FONT.weights.semibold }]}>
+                      {item}
+                    </Text>
+                    {sel && <Ionicons name="checkmark-circle" size={18} color={color} style={{ marginLeft: 'auto' }} />}
+                  </TouchableOpacity>
+                );
+              }}
+            />
+          </Animated.View>
+        </Animated.View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const ms = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheet: { backgroundColor: COLORS.bg.secondary, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingBottom: 40, maxHeight: '80%' },
-  handle: { width: 40, height: 4, backgroundColor: COLORS.border.default, borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 8 },
+  dragArea: { width: '100%', paddingTop: 4 },
+  handle: { width: 40, height: 4, backgroundColor: COLORS.border.default, borderRadius: 2, alignSelf: 'center', marginTop: 8, marginBottom: 4 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingTop: SPACING.sm },
   title: { fontSize: FONT.sizes.lg, color: COLORS.text.primary, fontWeight: FONT.weights.bold },
   closeBtn: { width: 36, height: 36, borderRadius: RADIUS.full, backgroundColor: COLORS.bg.elevated, justifyContent: 'center', alignItems: 'center' },
