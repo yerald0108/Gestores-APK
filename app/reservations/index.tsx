@@ -81,7 +81,7 @@ function ReservationCard({ item, onPress, onEdit, onWhatsApp, onDelete }: any) {
         <View style={s.totalSection}>
           <Text style={s.totalLabel}>Total a pagar</Text>
           <Text style={[s.totalAmount, { color: COLORS.accent.success }]}>
-            {item.total.toFixed(2)} CUP
+            {formatCurrency(item.total)} CUP
           </Text>
         </View>
 
@@ -178,9 +178,9 @@ export default function ReservationsScreen() {
       `👥 *Pasajeros (${passengerCount}):*`,
       passengerList,
       ``,
-      `💰 *Precio/pasajero:* ${item.route_price.toFixed(2)} CUP`,
-      item.advance > 0 ? `✅ *Anticipo:* ${item.advance.toFixed(2)} CUP` : '',
-      `💳 *Total a pagar:* ${item.total.toFixed(2)} CUP`,
+      `💰 *Precio/pasajero:* ${formatCurrency(item.route_price)} CUP`,
+      item.advance > 0 ? `✅ *Anticipo:* ${formatCurrency(item.advance)} CUP` : '',
+      `💳 *Total a pagar:* ${formatCurrency(item.total)} CUP`,
       paymentLine,
     ].filter(Boolean).join('\n');
     const clean = item.phone.replace(/\D/g, '');

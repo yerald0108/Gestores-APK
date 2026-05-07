@@ -580,7 +580,7 @@ export default function AddReservationScreen() {
                 <View style={[s.routePriceCard, { borderColor: accentColor + '44', backgroundColor: accentColor + '0D' }]}>
                   <Ionicons name="checkmark-circle" size={18} color={accentColor} />
                   <Text style={[s.routePriceText, { color: accentColor }]}>
-                    Ruta encontrada — {selectedRoute.price.toFixed(2)} CUP por pasajero
+                    Ruta encontrada — {formatCurrency(selectedRoute.price)} CUP por pasajero
                   </Text>
                 </View>
               )}
@@ -759,7 +759,7 @@ export default function AddReservationScreen() {
                     <View style={[s.appCostInfo, { borderColor: COLORS.accent.primary + '44', backgroundColor: COLORS.accent.primary + '0D' }]}>
                       <Ionicons name="phone-portrait-outline" size={16} color={COLORS.accent.primary} />
                       <Text style={[s.appCostText, { color: COLORS.accent.primary }]}>
-                        Costo por app: {appPrice.toFixed(2)} CUP/pasajero × {passengerCount} = {(appPrice * passengerCount).toFixed(2)} CUP
+                        Costo por app: {formatCurrency(appPrice)} CUP/pasajero × {passengerCount} = {formatCurrency(appPrice * passengerCount)} CUP
                       </Text>
                     </View>
                   )}
@@ -769,21 +769,21 @@ export default function AddReservationScreen() {
                     <View style={[s.gananciaPreview, { borderColor: gananciaPreview >= 0 ? COLORS.accent.success + '44' : COLORS.accent.danger + '44' }]}>
                       <View style={s.gananciaRow}>
                         <Text style={s.gananciaLabel}>Ingresos brutos</Text>
-                        <Text style={s.gananciaVal}>{subtotal.toFixed(2)} CUP</Text>
+                        <Text style={s.gananciaVal}>{formatCurrency(subtotal)} CUP</Text>
                       </View>
                       <View style={s.gananciaRow}>
                         <Text style={s.gananciaLabel}>
                           Costo {isGestor ? '(gestor)' : '(app)'} total
                         </Text>
                         <Text style={[s.gananciaVal, { color: COLORS.accent.danger }]}>
-                          -{totalCost.toFixed(2)} CUP
+                          -{formatCurrency(totalCost)} CUP
                         </Text>
                       </View>
                       <View style={[s.gananciaDivider, { backgroundColor: gananciaPreview >= 0 ? COLORS.accent.success + '33' : COLORS.accent.danger + '33' }]} />
                       <View style={s.gananciaRow}>
                         <Text style={[s.gananciaLabelBold]}>Ganancia estimada</Text>
                         <Text style={[s.gananciaBig, { color: gananciaPreview >= 0 ? COLORS.accent.success : COLORS.accent.danger }]}>
-                          {gananciaPreview >= 0 ? '+' : ''}{gananciaPreview.toFixed(2)} CUP
+                          {gananciaPreview >= 0 ? '+' : ''}{formatCurrency(gananciaPreview)} CUP
                         </Text>
                       </View>
                     </View>
@@ -902,22 +902,22 @@ export default function AddReservationScreen() {
               <Text style={s.summaryTitle}>Resumen de pago</Text>
               <View style={s.summaryRow}>
                 <Text style={s.summaryLabel}>Precio por pasajero</Text>
-                <Text style={s.summaryVal}>{routePrice.toFixed(2)} CUP</Text>
+                <Text style={s.summaryVal}>{formatCurrency(routePrice)} CUP</Text>
               </View>
               <View style={s.summaryRow}>
                 <Text style={s.summaryLabel}>× {passengerCount} pasajero{passengerCount !== 1 ? 's' : ''}</Text>
-                <Text style={s.summaryVal}>{subtotal.toFixed(2)} CUP</Text>
+                <Text style={s.summaryVal}>{formatCurrency(subtotal)} CUP</Text>
               </View>
               {advanceEnabled && advanceNum > 0 && (
                 <View style={s.summaryRow}>
                   <Text style={s.summaryLabel}>− Anticipo</Text>
-                  <Text style={[s.summaryVal, { color: COLORS.accent.success }]}>−{advanceNum.toFixed(2)} CUP</Text>
+                  <Text style={[s.summaryVal, { color: COLORS.accent.success }]}>−{formatCurrency(advanceNum)} CUP</Text>
                 </View>
               )}
               <View style={[s.summaryDivider, { backgroundColor: accentColor + '33' }]} />
               <View style={s.summaryRow}>
                 <Text style={s.summaryTotalLabel}>Total a pagar</Text>
-                <Text style={[s.summaryTotal, { color: accentColor }]}>{total.toFixed(2)} CUP</Text>
+                <Text style={[s.summaryTotal, { color: accentColor }]}>{formatCurrency(total)} CUP</Text>
               </View>
             </View>
           )}

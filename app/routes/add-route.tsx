@@ -10,7 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, FONT, RADIUS, TRANSPORT_CONFIG } from '@/constants/theme';
 import { getProvincesForTransport } from '@/constants/provinces';
 import { routesRepository } from '@/database/routesRepository';
-import { TransportType } from '@/types';
+import { TransportType, formatCurrency } from '@/types';
 
 function ProvinceSelectorModal({ visible, title, selected, excluded, color, transport, onSelect, onClose }: {
   visible: boolean; title: string; selected: string;
@@ -303,14 +303,14 @@ export default function AddRouteScreen() {
                 <View style={s.previewPriceItem}>
                   <Text style={s.previewPriceLabel}>Cliente</Text>
                   <Text style={[s.previewPrice, { color: config.color }]}>
-                    {parseFloat(price || '0').toFixed(2)} CUP
+                    {formatCurrency(price || '0')} CUP
                   </Text>
                 </View>
                 <View style={[s.previewDivider, { backgroundColor: COLORS.border.default }]} />
                 <View style={s.previewPriceItem}>
                   <Text style={s.previewPriceLabel}>App</Text>
                   <Text style={[s.previewPrice, { color: COLORS.accent.secondary }]}>
-                    {parseFloat(appPrice || '0').toFixed(2)} CUP
+                    {formatCurrency(appPrice || '0')} CUP
                   </Text>
                 </View>
               </View>

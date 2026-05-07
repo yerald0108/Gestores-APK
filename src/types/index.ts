@@ -116,3 +116,12 @@ export function calcFinancials(r: Reservation): ReservationFinancials {
     isGestor: r.is_gestor === 1,
   };
 }
+
+export function formatCurrency(value: number | string): string {
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(num)) return '0.00';
+  return num.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}

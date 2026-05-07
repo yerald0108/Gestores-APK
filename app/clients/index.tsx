@@ -112,7 +112,7 @@ function ReservationCard({ item, onDelete }: {
           <View>
             <Text style={[card.gananciaLabel, { color: COLORS.text.muted }]}>Ganancia</Text>
             <Text style={[card.gananciaVal, { color: gananciaColor }]}>
-              {fin.ganancia >= 0 ? '+' : ''}{fin.ganancia.toFixed(2)} CUP
+              {fin.ganancia >= 0 ? '+' : ''}{formatCurrency(fin.ganancia)} CUP
             </Text>
           </View>
         </View>
@@ -121,7 +121,7 @@ function ReservationCard({ item, onDelete }: {
             {item.is_gestor === 1 ? 'Vía gestor' : 'Vía app'}
           </Text>
           <Text style={[card.gananciaLabel, { color: COLORS.text.secondary, textAlign: 'right' }]} numberOfLines={1}>
-            {fin.costPerPassenger.toFixed(0)}×{fin.passengerCount}={fin.totalCost.toFixed(2)} CUP
+            {formatCurrency(fin.costPerPassenger)}×{fin.passengerCount}={formatCurrency(fin.totalCost)} CUP
           </Text>
         </View>
       </View>
@@ -131,7 +131,7 @@ function ReservationCard({ item, onDelete }: {
         <View style={[card.cobroBar, { backgroundColor: COLORS.accent.warning + '12', borderColor: COLORS.accent.warning + '33' }]}>
           <Ionicons name="cash-outline" size={15} color={COLORS.accent.warning} />
           <Text style={[card.cobroText, { color: COLORS.accent.warning }]}>
-            Pendiente de cobro: <Text style={{ fontWeight: FONT.weights.extrabold }}>{fin.restToCobrar.toFixed(2)} CUP</Text>
+            Pendiente de cobro: <Text style={{ fontWeight: FONT.weights.extrabold }}>{formatCurrency(fin.restToCobrar)} CUP</Text>
           </Text>
         </View>
       )}
@@ -169,18 +169,18 @@ function ReservationCard({ item, onDelete }: {
           <View style={[card.finBox, { borderColor: tc.color + '22' }]}>
             <FinRow
               label={`Precio cliente × ${fin.passengerCount} pasajero${fin.passengerCount !== 1 ? 's' : ''}`}
-              value={`${fin.totalClientPrice.toFixed(2)} CUP`}
+              value={`${formatCurrency(fin.totalClientPrice)} CUP`}
             />
             {fin.advancePaid > 0 && (
               <FinRow
                 label="— Anticipo pagado"
-                value={`-${fin.advancePaid.toFixed(2)} CUP`}
+                value={`-${formatCurrency(fin.advancePaid)} CUP`}
                 valueColor={COLORS.accent.success}
               />
             )}
             <FinRow
               label="Resto a cobrar al cliente"
-              value={`${fin.restToCobrar.toFixed(2)} CUP`}
+              value={`${formatCurrency(fin.restToCobrar)} CUP`}
               valueColor={fin.restToCobrar > 0 ? COLORS.accent.warning : COLORS.accent.success}
             />
 
@@ -188,11 +188,11 @@ function ReservationCard({ item, onDelete }: {
 
             <FinRow
               label={`Costo ${item.is_gestor === 1 ? 'gestor' : 'app'} × ${fin.passengerCount}`}
-              value={`-${fin.totalCost.toFixed(2)} CUP`}
+              value={`-${formatCurrency(fin.totalCost)} CUP`}
               valueColor={COLORS.accent.danger}
             />
             <FinRow
-              label={`  (${fin.costPerPassenger.toFixed(2)} CUP/pasajero)`}
+              label={`  (${formatCurrency(fin.costPerPassenger)} CUP/pasajero)`}
               value={item.is_gestor === 1 ? 'Gestor' : 'App'}
               valueColor={item.is_gestor === 1 ? COLORS.accent.warning : COLORS.accent.secondary}
             />
@@ -201,7 +201,7 @@ function ReservationCard({ item, onDelete }: {
 
             <FinRow
               label="GANANCIA REAL"
-              value={`${fin.ganancia >= 0 ? '+' : ''}${fin.ganancia.toFixed(2)} CUP`}
+              value={`${fin.ganancia >= 0 ? '+' : ''}${formatCurrency(fin.ganancia)} CUP`}
               valueColor={gananciaColor}
               bold
             />
@@ -391,7 +391,7 @@ export default function ClientsScreen() {
             </View>
             <Text style={s.summaryLabel}>Ganancia total</Text>
             <Text style={[s.summaryVal, { color: COLORS.accent.success }]} numberOfLines={1} adjustsFontSizeToFit>
-              {totals.ganancia >= 0 ? '+' : ''}{totals.ganancia.toFixed(2)}
+              {totals.ganancia >= 0 ? '+' : ''}{formatCurrency(totals.ganancia)}
             </Text>
             <Text style={s.summaryCurrency}>CUP</Text>
           </View>
@@ -401,7 +401,7 @@ export default function ClientsScreen() {
             </View>
             <Text style={s.summaryLabel}>Por cobrar</Text>
             <Text style={[s.summaryVal, { color: COLORS.accent.warning }]} numberOfLines={1} adjustsFontSizeToFit>
-              {totals.porCobrar.toFixed(2)}
+              {formatCurrency(totals.porCobrar)}
             </Text>
             <Text style={s.summaryCurrency}>CUP</Text>
           </View>

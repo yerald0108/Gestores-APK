@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, FONT, RADIUS, TRANSPORT_CONFIG } from '@/constants/theme';
 import { reservationsRepository } from '@/database/reservationsRepository';
 import { BANK_CONFIG } from '@/services/userProfileService';
-import { Reservation } from '@/types';
+import { Reservation, formatCurrency } from '@/types';
 
 function InfoRow({ icon, label, value, color }: { icon: string; label: string; value: string; color: string }) {
   return (
@@ -72,9 +72,9 @@ export default function ReservationDetailScreen() {
       `👥 *Pasajeros (${reservation.passengers?.length ?? 0}):*`,
       passengerList,
       ``,
-      `💰 *Precio/pasajero:* ${reservation.route_price.toFixed(2)} CUP`,
-      reservation.advance > 0 ? `✅ *Anticipo:* ${reservation.advance.toFixed(2)} CUP` : '',
-      `💳 *Total a pagar:* ${reservation.total.toFixed(2)} CUP`,
+      `💰 *Precio/pasajero:* ${formatCurrency(reservation.route_price)} CUP`,
+      reservation.advance > 0 ? `✅ *Anticipo:* ${formatCurrency(reservation.advance)} CUP` : '',
+      `💳 *Total a pagar:* ${formatCurrency(reservation.total)} CUP`,
       paymentLine,
       `📊 *Estado:* ${reservation.status}`,
     ].filter(Boolean).join('\n');
@@ -155,22 +155,22 @@ export default function ReservationDetailScreen() {
           <Text style={d.sectionTitle}>Resumen de pago</Text>
           <View style={d.payRow}>
             <Text style={d.payLabel}>Precio por pasajero</Text>
-            <Text style={d.payVal}>{reservation.route_price.toFixed(2)} CUP</Text>
+            <Text style={d.payVal}>{formatCurrency(reservation.route_price)} CUP</Text>
           </View>
           <View style={d.payRow}>
             <Text style={d.payLabel}>× {reservation.passengers?.length ?? 0} pasajeros</Text>
-            <Text style={d.payVal}>{(reservation.route_price * (reservation.passengers?.length ?? 0)).toFixed(2)} CUP</Text>
+            <Text style={d.payVal}>{formatCurrency(reservation.route_price * (reservation.passengers?.length ?? 0))} CUP</Text>
           </View>
           {reservation.advance > 0 && (
             <View style={d.payRow}>
               <Text style={d.payLabel}>− Anticipo</Text>
-              <Text style={[d.payVal, { color: COLORS.accent.success }]}>−{reservation.advance.toFixed(2)} CUP</Text>
+              <Text style={[d.payVal, { color: COLORS.accent.success }]}>−{formatCurrency(reservation.advance)} CUP</Text>
             </View>
           )}
           <View style={[d.payDivider, { backgroundColor: tc.color + '33' }]} />
           <View style={d.payRow}>
             <Text style={d.payTotalLabel}>Total a pagar</Text>
-            <Text style={[d.payTotal, { color: tc.color }]}>{reservation.total.toFixed(2)} CUP</Text>
+            <Text style={[d.payTotal, { color: tc.color }]}>{formatCurrency(reservation.total)} CUP</Text>
           </View>
         </View>
       </ScrollView>

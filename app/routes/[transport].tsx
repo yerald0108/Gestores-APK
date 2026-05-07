@@ -130,13 +130,13 @@ export default function TransportRoutesScreen() {
                   <View style={[styles.priceTag, { backgroundColor: config.color + '1A' }]}>
                     <Text style={styles.priceLabel}>Cliente</Text>
                     <Text style={[styles.priceText, { color: config.color }]}>
-                      {item.price.toFixed(2)} CUP
+                      {formatCurrency(item.price)} CUP
                     </Text>
                   </View>
                   <View style={[styles.priceTag, { backgroundColor: COLORS.accent.secondary + '1A', marginTop: 4 }]}>
                     <Text style={styles.priceLabel}>App</Text>
                     <Text style={[styles.priceText, { color: COLORS.accent.secondary }]}>
-                      {(item.app_price ?? 0).toFixed(2)} CUP
+                      {formatCurrency(item.app_price ?? 0)} CUP
                     </Text>
                   </View>
                 </View>

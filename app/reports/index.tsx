@@ -1,3 +1,4 @@
+import { formatCurrency } from '@/types';
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
@@ -60,7 +61,7 @@ function BarChart({
         <View style={[ch.tooltip, { borderColor: color + '66', backgroundColor: COLORS.bg.secondary }]}>
           <Text style={[ch.tooltipLabel, { color: COLORS.text.muted }]}>{data[selected].label}</Text>
           <Text style={[ch.tooltipVal, { color }]}>
-            {prefix}{(data[selected][valueKey] as number).toFixed(valueKey === 'ganancia' ? 2 : 0)}{suffix}
+            {prefix}{formatCurrency(data[selected][valueKey] as number)}{suffix}
           </Text>
         </View>
       )}
@@ -136,7 +137,7 @@ function LineChart({
         <View style={[ch.tooltip, { borderColor: color + '66', backgroundColor: COLORS.bg.secondary }]}>
           <Text style={[ch.tooltipLabel, { color: COLORS.text.muted }]}>{data[selected].label}</Text>
           <Text style={[ch.tooltipVal, { color }]}>
-            {(data[selected][valueKey] as number).toFixed(valueKey === 'ganancia' ? 2 : 0)}
+            {formatCurrency(data[selected][valueKey] as number)}
           </Text>
         </View>
       )}
@@ -267,7 +268,7 @@ function DonutChart({ gestor, app }: { gestor: number; app: number }) {
           <View>
             <Text style={donut.legendLabel}>Vía gestor</Text>
             <Text style={[donut.legendVal, { color: COLORS.accent.warning }]}>
-              {gestor.toFixed(2)} CUP
+              {formatCurrency(gestor)} CUP
             </Text>
             <Text style={donut.legendPct}>{pctGestor}%</Text>
           </View>
@@ -277,7 +278,7 @@ function DonutChart({ gestor, app }: { gestor: number; app: number }) {
           <View>
             <Text style={donut.legendLabel}>Vía app</Text>
             <Text style={[donut.legendVal, { color: COLORS.accent.primary }]}>
-              {app.toFixed(2)} CUP
+              {formatCurrency(app)} CUP
             </Text>
             <Text style={donut.legendPct}>{pctApp}%</Text>
           </View>
@@ -455,7 +456,7 @@ export default function ReportsScreen() {
             <KpiCard
               icon="trending-up"
               label="Ganancia total"
-              value={`${global!.totalGanancia >= 0 ? '+' : ''}${global!.totalGanancia.toFixed(0)}`}
+              value={`${global!.totalGanancia >= 0 ? '+' : ''}${formatCurrency(global!.totalGanancia)}`}
               sub="CUP acumulado"
               color={COLORS.accent.success}
             />
@@ -554,7 +555,7 @@ export default function ReportsScreen() {
                   <View key={i} style={[s.periodRow, i % 2 === 0 && { backgroundColor: COLORS.bg.elevated }]}>
                     <Text style={[s.periodVal, { flex: 1.2 }]}>{d.label}</Text>
                     <Text style={[s.periodVal, { flex: 1.5, textAlign: 'right', color: d.ganancia >= 0 ? COLORS.accent.success : COLORS.accent.danger }]}>
-                      {d.ganancia >= 0 ? '+' : ''}{d.ganancia.toFixed(2)}
+                      {d.ganancia >= 0 ? '+' : ''}{formatCurrency(d.ganancia)}
                     </Text>
                     <Text style={[s.periodVal, { flex: 0.8, textAlign: 'center', color: COLORS.accent.primary }]}>{d.pasajeros}</Text>
                     <Text style={[s.periodVal, { flex: 0.8, textAlign: 'center', color: COLORS.accent.secondary }]}>{d.reservas}</Text>
