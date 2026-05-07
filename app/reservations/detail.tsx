@@ -49,6 +49,7 @@ export default function ReservationDetailScreen() {
 
     // Línea de método de pago
     let paymentLine = '';
+    const isFullAdvance = reservation.advance === reservation.route_price;
     if (reservation.payment_method) {
       const bankLabel = BANK_CONFIG[reservation.payment_method as keyof typeof BANK_CONFIG]?.label ?? reservation.payment_method;
 
@@ -76,8 +77,8 @@ export default function ReservationDetailScreen() {
       ``,
       `💰 *Precio/pasajero:* ${formatCurrency(reservation.route_price)} CUP`,
       reservation.advance > 0 ? `✅ *Anticipo:* ${formatCurrency(reservation.advance)} CUP` : '',
-      `💳 *Total a pagar:* ${formatCurrency(reservation.total)} CUP`,
-      paymentLine,
+      isFullAdvance ? `🎊 *Pago completo realizado*` : `💳 *Total a pagar:* ${formatCurrency(reservation.total)} CUP`,
+      !isFullAdvance ? paymentLine : '',
       `📊 *Estado:* ${reservation.status}`,
     ].filter(Boolean).join('\n');
 
@@ -89,13 +90,13 @@ export default function ReservationDetailScreen() {
   const handleDelete = () => {
     Alert.alert('Eliminar', '¿Eliminar este pedido?', [
       { text: 'Cancelar', style: 'cancel' },
-      { 
-        text: 'Eliminar', style: 'destructive', 
-        onPress: async () => { 
-          await reservationsRepository.delete(reservation.id); 
+      {
+        text: 'Eliminar', style: 'destructive',
+        onPress: async () => {
+          await reservationsRepository.delete(reservation.id);
           toast.show({ message: 'Pedido eliminado', type: 'success' });
           setTimeout(() => router.back(), 500);
-        } 
+        }
       },
     ]);
   };

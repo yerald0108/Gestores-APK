@@ -12,6 +12,7 @@ import { reservationsRepository } from '@/database/reservationsRepository';
 import { BANK_CONFIG } from '@/services/userProfileService';
 import { Reservation, formatCurrency } from '@/types';
 import Skeleton from '@/components/ui/Skeleton';
+import { useGlobalToast } from '@/components/ui/Toast';
 
 function formatDate(dateStr: string) {
   const d = new Date(dateStr);
@@ -108,6 +109,7 @@ export default function ReservationsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
+  const toast = useGlobalToast();
 
   const load = useCallback(async (isRefresh = false) => {
     try {
@@ -140,7 +142,14 @@ export default function ReservationsScreen() {
   const handleDelete = (r: Reservation) => {
     Alert.alert('Eliminar pedido', `¿Eliminar el pedido #${r.id}?`, [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Eliminar', style: 'destructive', onPress: async () => { await reservationsRepository.delete(r.id); load(); } },
+      { 
+        text: 'Eliminar', style: 'destructive', 
+        onPress: async () => { 
+          await reservationsRepository.delete(r.id); 
+          toast.show({ message: 'Pedido eliminado', type: 'success' });
+          load(); 
+        } 
+      },
     ]);
   };
 
@@ -153,6 +162,8 @@ export default function ReservationsScreen() {
 
     // Línea de método de pago
     let paymentLine = '';
+    const isFullAdvance = item.advance === item.route_price;
+
     if (item.payment_method) {
       const bankLabel = BANK_CONFIG[item.payment_method as keyof typeof BANK_CONFIG]?.label ?? item.payment_method;
 
@@ -160,10 +171,13 @@ export default function ReservationsScreen() {
         paymentLine = `📲 *Pago:* MiTransfer — ${item.payment_confirm_number}`;
       } else {
         // Número completo para que el cliente lo copie directamente
-        const cardPart = item.payment_card_number
+        const cardPart = (item.payment_card_number && !isFullAdvance)
           ? `Tarjeta: \`${item.payment_card_number}\``
           : bankLabel;
-        paymentLine = `💳 *Pago:* ${bankLabel}\n${cardPart}\nConfirmar al: ${item.payment_confirm_number}`;
+        
+        paymentLine = isFullAdvance
+          ? `💳 *Pago:* ${bankLabel}`
+          : `💳 *Pago:* ${bankLabel}\n${cardPart}\nConfirmar al: ${item.payment_confirm_number}`;
       }
     }
 
@@ -180,8 +194,8 @@ export default function ReservationsScreen() {
       ``,
       `💰 *Precio/pasajero:* ${formatCurrency(item.route_price)} CUP`,
       item.advance > 0 ? `✅ *Anticipo:* ${formatCurrency(item.advance)} CUP` : '',
-      `💳 *Total a pagar:* ${formatCurrency(item.total)} CUP`,
-      paymentLine,
+      isFullAdvance ? `🎊 *Pago completo realizado*` : `💳 *Total a pagar:* ${formatCurrency(item.total)} CUP`,
+      !isFullAdvance ? paymentLine : '',
     ].filter(Boolean).join('\n');
     const clean = item.phone.replace(/\D/g, '');
     Linking.openURL(`whatsapp://send?phone=53${clean}&text=${encodeURIComponent(msg)}`)

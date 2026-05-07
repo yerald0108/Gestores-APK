@@ -191,6 +191,7 @@ export default function UserProfileModal({ visible, onClose }: Props) {
     const updated = await userProfileService.updateProfile(name.trim(), phone.trim());
     setProfile(updated);
     setSaving(false);
+    onClose();
     toast.show({
       message: 'Perfil actualizado correctamente',
       type: 'success',
@@ -201,9 +202,11 @@ export default function UserProfileModal({ visible, onClose }: Props) {
     let updated;
     if (editingCard) {
       updated = await userProfileService.editCard(editingCard.id, card);
+      onClose();
       toast.show({ message: 'Tarjeta actualizada', type: 'success' });
     } else {
       updated = await userProfileService.addCard(card);
+      onClose();
       toast.show({ message: 'Tarjeta añadida', type: 'success' });
     }
     setProfile(updated);
@@ -219,6 +222,7 @@ export default function UserProfileModal({ visible, onClose }: Props) {
         onPress: async () => {
           const updated = await userProfileService.removeCard(cardId);
           setProfile(updated);
+          onClose();
           toast.show({ message: 'Tarjeta eliminada', type: 'success' });
         },
       },

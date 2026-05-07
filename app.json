@@ -6,16 +6,19 @@
     "icon": "./assets/icon.png",
     "orientation": "portrait",
     "scheme": "viajando",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0A0E1A",
     "android": {
-      "package": "com.viajando.manager"
+      "package": "com.viajando.manager",
+      "backgroundColor": "#0A0E1A"
     },
     "adaptiveIcon": {
       "foregroundImage": "./assets/adaptive-icon.png",
-      "backgroundColor": "#38404D"
+      "backgroundColor": "#0A0E1A"
     },
     "ios": {
-      "bundleIdentifier": "com.viajando.manager"
+      "bundleIdentifier": "com.viajando.manager",
+      "backgroundColor": "#0A0E1A"
     },
     "plugins": [
       "expo-router",
