@@ -10,6 +10,10 @@
     "android": {
       "package": "com.viajando.manager"
     },
+    "adaptiveIcon": {
+      "foregroundImage": "./assets/adaptive-icon.png",
+      "backgroundColor": "#38404D"
+    },
     "ios": {
       "bundleIdentifier": "com.viajando.manager"
     },
@@ -20,6 +24,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "964a1872-4ffc-47d2-a8a9-587e75143a2b"
+      }
+    },
+    "owner": "yeraldgonzalez"
   }
 }
