@@ -60,6 +60,13 @@ export const userProfileService = {
     return profile;
   },
 
+  async editCard(cardId: string, updatedData: Omit<BankCard, 'id'>): Promise<UserProfile> {
+    const profile = await this.get();
+    profile.cards = profile.cards.map(c => c.id === cardId ? { ...c, ...updatedData } : c);
+    await this.save(profile);
+    return profile;
+  },
+
   async updateProfile(name: string, phone: string): Promise<UserProfile> {
     const profile = await this.get();
     profile.name = name;

@@ -17,7 +17,7 @@ import { getProvincesForTransport } from '@/constants/provinces';
 import { routesRepository } from '@/database/routesRepository';
 import { reservationsRepository } from '@/database/reservationsRepository';
 import { getDatabase } from '@/database/db';
-import { Route, TransportType, Passenger } from '@/types';
+import { Route, TransportType, Passenger, formatCurrency } from '@/types';
 import PaymentMethodSelector, { PaymentSelection } from '@/components/PaymentMethodSelector';
 import { BANK_CONFIG, userProfileService } from '@/services/userProfileService';
 import { useGlobalToast } from '@/components/ui/Toast';
@@ -404,10 +404,10 @@ export default function AddReservationScreen() {
           updated_at=?
           WHERE id=?`,
           [phone.trim(), transport, origin, destination, routePrice,
-          travelISO, reservationISO, advanceNum, total,
+            travelISO, reservationISO, advanceNum, total,
           isReserved ? 'Reservado' : 'Pendiente',
-          finalIsGestor, finalGestorCost, finalAppCost,
-          finalPaymentMethod, finalPaymentConfirm, finalPaymentCardNumber,
+            finalIsGestor, finalGestorCost, finalAppCost,
+            finalPaymentMethod, finalPaymentConfirm, finalPaymentCardNumber,
           new Date().toISOString(),
           Number(editId)]
         );
@@ -841,11 +841,11 @@ export default function AddReservationScreen() {
             </View>
             {paymentSelection
               ? <TouchableOpacity
-                  onPress={(e) => { e.stopPropagation(); setPaymentSelection(null); }}
-                  style={{ padding: 4 }}
-                >
-                  <Ionicons name="close-circle" size={20} color={COLORS.text.muted} />
-                </TouchableOpacity>
+                onPress={(e) => { e.stopPropagation(); setPaymentSelection(null); }}
+                style={{ padding: 4 }}
+              >
+                <Ionicons name="close-circle" size={20} color={COLORS.text.muted} />
+              </TouchableOpacity>
               : <Ionicons name="chevron-forward" size={18} color={COLORS.text.muted} />
             }
           </TouchableOpacity>

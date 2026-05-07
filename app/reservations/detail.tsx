@@ -7,6 +7,7 @@ import { COLORS, SPACING, FONT, RADIUS, TRANSPORT_CONFIG } from '@/constants/the
 import { reservationsRepository } from '@/database/reservationsRepository';
 import { BANK_CONFIG } from '@/services/userProfileService';
 import { Reservation, formatCurrency } from '@/types';
+import { useGlobalToast } from '@/components/ui/Toast';
 
 function InfoRow({ icon, label, value, color }: { icon: string; label: string; value: string; color: string }) {
   return (
@@ -25,6 +26,7 @@ function InfoRow({ icon, label, value, color }: { icon: string; label: string; v
 export default function ReservationDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [reservation, setReservation] = useState<Reservation | null>(null);
+  const toast = useGlobalToast();
 
   useFocusEffect(useCallback(() => {
     reservationsRepository.getById(Number(id)).then(setReservation);
@@ -87,7 +89,14 @@ export default function ReservationDetailScreen() {
   const handleDelete = () => {
     Alert.alert('Eliminar', '¿Eliminar este pedido?', [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Eliminar', style: 'destructive', onPress: async () => { await reservationsRepository.delete(reservation.id); router.back(); } },
+      { 
+        text: 'Eliminar', style: 'destructive', 
+        onPress: async () => { 
+          await reservationsRepository.delete(reservation.id); 
+          toast.show({ message: 'Pedido eliminado', type: 'success' });
+          setTimeout(() => router.back(), 500);
+        } 
+      },
     ]);
   };
 

@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, FONT, RADIUS, TRANSPORT_CONFIG } from '@/constants/theme';
+import { useGlobalToast } from '@/components/ui/Toast';
 import { getProvincesForTransport } from '@/constants/provinces';
 import { routesRepository } from '@/database/routesRepository';
 import { TransportType, formatCurrency } from '@/types';
@@ -109,6 +110,7 @@ export default function AddRouteScreen() {
   const transportKey = transport as TransportType;
   const config = TRANSPORT_CONFIG[transportKey];
   const isEditing = !!editId;
+  const toast = useGlobalToast();
 
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
@@ -159,6 +161,7 @@ export default function AddRouteScreen() {
       isEditing
         ? await routesRepository.update(Number(editId), data)
         : await routesRepository.create(data);
+      toast.show({ message: isEditing ? 'Ruta actualizada' : 'Ruta creada', type: 'success' });
       router.back();
     } catch {
       Alert.alert('Error', 'No se pudo guardar la ruta');

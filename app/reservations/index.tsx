@@ -10,7 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, FONT, RADIUS, TRANSPORT_CONFIG } from '@/constants/theme';
 import { reservationsRepository } from '@/database/reservationsRepository';
 import { BANK_CONFIG } from '@/services/userProfileService';
-import { Reservation } from '@/types';
+import { Reservation, formatCurrency } from '@/types';
 import Skeleton from '@/components/ui/Skeleton';
 
 function formatDate(dateStr: string) {

@@ -8,8 +8,9 @@ import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, FONT, RADIUS, TRANSPORT_CONFIG } from '@/constants/theme';
 import { reservationsRepository } from '@/database/reservationsRepository';
-import { Reservation, calcFinancials } from '@/types';
+import { Reservation, calcFinancials, formatCurrency } from '@/types';
 import Skeleton from '@/components/ui/Skeleton';
+import { useGlobalToast } from '@/components/ui/Toast';
 
 function formatDate(dateStr: string) {
   const d = new Date(dateStr);
@@ -301,6 +302,7 @@ export default function ClientsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
+  const toast = useGlobalToast();
 
   const load = useCallback(async (isRefresh = false) => {
     try {
@@ -343,7 +345,11 @@ export default function ClientsScreen() {
       { text: 'Cancelar', style: 'cancel' },
       {
         text: 'Eliminar', style: 'destructive',
-        onPress: async () => { await reservationsRepository.delete(r.id); load(); }
+        onPress: async () => { 
+          await reservationsRepository.delete(r.id); 
+          toast.show({ message: 'Reserva eliminada', type: 'success' });
+          load(); 
+        }
       },
     ]);
   };

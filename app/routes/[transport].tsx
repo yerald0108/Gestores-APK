@@ -13,12 +13,14 @@ import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, FONT, RADIUS, TRANSPORT_CONFIG } from '@/constants/theme';
 import { routesRepository } from '@/database/routesRepository';
-import { Route, TransportType } from '@/types';
+import { Route, TransportType, formatCurrency } from '@/types';
+import { useGlobalToast } from '@/components/ui/Toast';
 
 export default function TransportRoutesScreen() {
   const { transport } = useLocalSearchParams<{ transport: string }>();
   const transportKey = transport as TransportType;
   const config = TRANSPORT_CONFIG[transportKey];
+  const toast = useGlobalToast();
 
   const [routes, setRoutes] = useState<Route[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,6 +50,7 @@ export default function TransportRoutesScreen() {
           style: 'destructive',
           onPress: async () => {
             await routesRepository.delete(route.id);
+            toast.show({ message: 'Ruta eliminada', type: 'success' });
             loadRoutes();
           },
         },
@@ -225,15 +228,15 @@ const styles = StyleSheet.create({
   dot: { width: 6, height: 6, borderRadius: 3 },
   line: { flex: 1, height: 1 },
   priceTag: {
-  paddingHorizontal: SPACING.sm,
-  paddingVertical: SPACING.xs,
-  borderRadius: RADIUS.md,
-  alignItems: 'flex-end',
-},
-priceText: {
-  fontSize: FONT.sizes.sm,
-  fontWeight: FONT.weights.bold,
-},
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: RADIUS.md,
+    alignItems: 'flex-end',
+  },
+  priceText: {
+    fontSize: FONT.sizes.sm,
+    fontWeight: FONT.weights.bold,
+  },
   routeActions: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   dateText: { fontSize: FONT.sizes.xs, color: COLORS.text.muted },
   actionBtns: { flexDirection: 'row', gap: SPACING.xs },
@@ -243,13 +246,13 @@ priceText: {
   },
   deleteBtn: { backgroundColor: COLORS.accent.danger + '1A' },
   pricesCol: {
-  alignItems: 'flex-end',
-  gap: 4,
-},
-priceLabel: {
-  fontSize: FONT.sizes.xs,
-  color: COLORS.text.muted,
-  fontWeight: FONT.weights.medium,
-  marginBottom: 1,
-},
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  priceLabel: {
+    fontSize: FONT.sizes.xs,
+    color: COLORS.text.muted,
+    fontWeight: FONT.weights.medium,
+    marginBottom: 1,
+  },
 });

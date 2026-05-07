@@ -47,7 +47,7 @@ const bs = StyleSheet.create({
 });
 
 // ── Tarjeta bancaria (ítem de lista) ────────────────────────────────────────
-function CardItem({ card, onRemove }: { card: BankCard; onRemove: () => void }) {
+function CardItem({ card, onEdit, onRemove }: { card: BankCard; onEdit: () => void; onRemove: () => void }) {
   const cfg = BANK_CONFIG[card.bank];
   const last4 = card.cardNumber.slice(-4);
   return (
@@ -59,9 +59,14 @@ function CardItem({ card, onRemove }: { card: BankCard; onRemove: () => void }) 
         <Text style={[ci.bank, { color: cfg.color }]}>{cfg.label}</Text>
         <Text style={ci.number}>•••• •••• •••• {last4}</Text>
       </View>
-      <TouchableOpacity style={ci.removeBtn} onPress={onRemove}>
-        <Ionicons name="close" size={16} color={COLORS.accent.danger} />
-      </TouchableOpacity>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <TouchableOpacity style={ci.editBtn} onPress={onEdit}>
+          <Ionicons name="pencil" size={16} color={COLORS.accent.primary} />
+        </TouchableOpacity>
+        <TouchableOpacity style={ci.removeBtn} onPress={onRemove}>
+          <Ionicons name="close" size={16} color={COLORS.accent.danger} />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -71,17 +76,31 @@ const ci = StyleSheet.create({
   iconWrap: { width: 36, height: 36, borderRadius: RADIUS.md, justifyContent: 'center', alignItems: 'center' },
   bank: { fontSize: FONT.sizes.sm, fontWeight: FONT.weights.bold },
   number: { fontSize: FONT.sizes.xs, color: COLORS.text.muted, marginTop: 1 },
+  editBtn: { width: 28, height: 28, borderRadius: RADIUS.full, backgroundColor: COLORS.accent.primary + '1A', justifyContent: 'center', alignItems: 'center' },
   removeBtn: { width: 28, height: 28, borderRadius: RADIUS.full, backgroundColor: COLORS.accent.danger + '1A', justifyContent: 'center', alignItems: 'center' },
 });
 
 // ── Formulario añadir tarjeta ───────────────────────────────────────────────
-function AddCardForm({ onAdd, onCancel }: {
+function AddCardForm({ initialData, onAdd, onCancel }: {
+  initialData?: BankCard | null;
   onAdd: (card: Omit<BankCard, 'id'>) => void;
   onCancel: () => void;
 }) {
-  const [bank, setBank] = useState<BankType | null>(null);
-  const [number, setNumber] = useState('');
+  const [bank, setBank] = useState<BankType | null>(initialData?.bank || null);
+  const [number, setNumber] = useState(initialData?.cardNumber ? formatCardNumber(initialData.cardNumber) : '');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (initialData) {
+      setBank(initialData.bank);
+      setNumber(formatCardNumber(initialData.cardNumber));
+    }
+  }, [initialData]);
+
+  function formatCardNumber(v: string) {
+    const digits = v.replace(/\D/g, '').slice(0, 16);
+    return digits.replace(/(.{4})/g, '$1 ').trim();
+  }
 
   const handleAdd = () => {
     if (!bank) { setError('Selecciona un banco'); return; }
@@ -92,14 +111,9 @@ function AddCardForm({ onAdd, onCancel }: {
     setError('');
   };
 
-  const formatCardNumber = (v: string) => {
-    const digits = v.replace(/\D/g, '').slice(0, 16);
-    return digits.replace(/(.{4})/g, '$1 ').trim();
-  };
-
   return (
     <View style={[af.form, { borderColor: bank ? BANK_CONFIG[bank].color + '44' : COLORS.border.default }]}>
-      <Text style={af.title}>Nueva tarjeta</Text>
+      <Text style={af.title}>{initialData ? 'Editar tarjeta' : 'Nueva tarjeta'}</Text>
       <BankSelector selected={bank} onSelect={(b) => { setBank(b); setError(''); }} />
       <View style={[af.inputRow, error && !bank ? af.inputErr : null]}>
         <View style={[af.iconWrap, { backgroundColor: bank ? BANK_CONFIG[bank].color + '1A' : COLORS.bg.elevated }]}>
@@ -124,8 +138,8 @@ function AddCardForm({ onAdd, onCancel }: {
           style={[af.addBtn, { backgroundColor: bank ? BANK_CONFIG[bank].color : COLORS.accent.primary }]}
           onPress={handleAdd}
         >
-          <Ionicons name="add" size={16} color="#fff" />
-          <Text style={af.addText}>Añadir</Text>
+          <Ionicons name={initialData ? "save-outline" : "add"} size={16} color="#fff" />
+          <Text style={af.addText}>{initialData ? 'Guardar' : 'Añadir'}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -158,6 +172,7 @@ export default function UserProfileModal({ visible, onClose }: Props) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [showAddCard, setShowAddCard] = useState(false);
+  const [editingCard, setEditingCard] = useState<BankCard | null>(null);
   const [saving, setSaving] = useState(false);
   const toast = useGlobalToast();
 
@@ -183,9 +198,17 @@ export default function UserProfileModal({ visible, onClose }: Props) {
   };
 
   const handleAddCard = async (card: Omit<BankCard, 'id'>) => {
-    const updated = await userProfileService.addCard(card);
+    let updated;
+    if (editingCard) {
+      updated = await userProfileService.editCard(editingCard.id, card);
+      toast.show({ message: 'Tarjeta actualizada', type: 'success' });
+    } else {
+      updated = await userProfileService.addCard(card);
+      toast.show({ message: 'Tarjeta añadida', type: 'success' });
+    }
     setProfile(updated);
     setShowAddCard(false);
+    setEditingCard(null);
   };
 
   const handleRemoveCard = (cardId: string) => {
@@ -196,6 +219,7 @@ export default function UserProfileModal({ visible, onClose }: Props) {
         onPress: async () => {
           const updated = await userProfileService.removeCard(cardId);
           setProfile(updated);
+          toast.show({ message: 'Tarjeta eliminada', type: 'success' });
         },
       },
     ]);
@@ -289,8 +313,12 @@ export default function UserProfileModal({ visible, onClose }: Props) {
 
               {showAddCard && (
                 <AddCardForm
+                  initialData={editingCard}
                   onAdd={handleAddCard}
-                  onCancel={() => setShowAddCard(false)}
+                  onCancel={() => {
+                    setShowAddCard(false);
+                    setEditingCard(null);
+                  }}
                 />
               )}
 
@@ -304,6 +332,10 @@ export default function UserProfileModal({ visible, onClose }: Props) {
                   <CardItem
                     key={card.id}
                     card={card}
+                    onEdit={() => {
+                      setEditingCard(card);
+                      setShowAddCard(true);
+                    }}
                     onRemove={() => handleRemoveCard(card.id)}
                   />
                 ))
