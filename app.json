@@ -10,11 +10,11 @@
     "backgroundColor": "#0A0E1A",
     "android": {
       "package": "com.viajando.manager",
-      "backgroundColor": "#0A0E1A"
-    },
-    "adaptiveIcon": {
-      "foregroundImage": "./assets/adaptive-icon.png",
-      "backgroundColor": "#0A0E1A"
+      "backgroundColor": "#0A0E1A",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0A0E1A"
+      }
     },
     "ios": {
       "bundleIdentifier": "com.viajando.manager",
@@ -23,7 +23,8 @@
     "plugins": [
       "expo-router",
       "expo-sqlite",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true
