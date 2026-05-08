@@ -1,5 +1,6 @@
 import { getDatabase } from './db';
 import { Reservation, CreateReservationDTO, Passenger } from '../types';
+import { parseISODate } from '../utils/dateUtils';
 
 // ── Helpers internos ──────────────────────────────────────────────────────────
 
@@ -210,7 +211,7 @@ export const reservationsRepository = {
     const map = new Map<string, { ganancia: number; pasajeros: number; reservas: number }>();
 
     for (const r of rows) {
-      const date = new Date(r.reservation_date);
+      const date = parseISODate(r.reservation_date);
       let label = '';
 
       if (period === 'day') {

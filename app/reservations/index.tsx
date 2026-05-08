@@ -13,10 +13,10 @@ import { BANK_CONFIG } from '@/services/userProfileService';
 import { Reservation, formatCurrency } from '@/types';
 import Skeleton from '@/components/ui/Skeleton';
 import { useGlobalToast } from '@/components/ui/Toast';
+import { formatDateDisplay, getSafeDateParts } from '@/utils/dateUtils';
 
 function formatDate(dateStr: string) {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+  return formatDateDisplay(dateStr);
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -181,13 +181,16 @@ export default function ReservationsScreen() {
       }
     }
 
+    const travelParts = getSafeDateParts(item.travel_date);
+    const resParts = getSafeDateParts(item.reservation_date);
+
     const msg = [
       `🧳 *Pedido #${item.id} — Viajando*`,
       ``,
       `🚌 *Transporte:* ${tc.label}`,
       `📍 *Ruta:* ${item.origin} → ${item.destination}`,
-      `📋 *Fecha de reserva:* ${new Date(item.reservation_date).toLocaleDateString('es-ES')}`,
-      `📅 *Fecha de viaje:* ${new Date(item.travel_date).toLocaleDateString('es-ES')}`,
+      `📋 *Fecha de reserva:* ${resParts.d}/${resParts.m}/${resParts.y}`,
+      `📅 *Fecha de viaje:* ${travelParts.d}/${travelParts.m}/${travelParts.y}`,
       ``,
       `👥 *Pasajeros (${passengerCount}):*`,
       passengerList,

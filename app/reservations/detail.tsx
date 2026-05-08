@@ -8,6 +8,7 @@ import { reservationsRepository } from '@/database/reservationsRepository';
 import { BANK_CONFIG } from '@/services/userProfileService';
 import { Reservation, formatCurrency } from '@/types';
 import { useGlobalToast } from '@/components/ui/Toast';
+import { getSafeDateParts } from '@/utils/dateUtils';
 
 function InfoRow({ icon, label, value, color }: { icon: string; label: string; value: string; color: string }) {
   return (
@@ -42,107 +43,117 @@ export default function ReservationDetailScreen() {
 
   const tc = TRANSPORT_CONFIG[reservation.transport];
 
-  const handleShare = () => {
-    const passengerList = (reservation.passengers ?? []).map((p, i) =>
-      `  ${i + 1}. ${p.full_name} (CI: ${p.identity_card})`
-    ).join('\n');
 
-    // Línea de método de pago
-    let paymentLine = '';
-    const isFullAdvance = reservation.advance === reservation.route_price;
-    if (reservation.payment_method) {
-      const bankLabel = BANK_CONFIG[reservation.payment_method as keyof typeof BANK_CONFIG]?.label ?? reservation.payment_method;
+    const travelParts = getSafeDateParts(reservation.travel_date);
+    const resParts = getSafeDateParts(reservation.reservation_date);
 
-      if (reservation.payment_method === 'mitransfer') {
-        paymentLine = `📲 *Pago:* MiTransfer — ${reservation.payment_confirm_number}`;
-      } else {
-        // Número completo para que el cliente lo copie directamente
-        const cardPart = reservation.payment_card_number
-          ? `Tarjeta: \`${reservation.payment_card_number}\``
-          : bankLabel;
-        paymentLine = `💳 *Pago:* ${bankLabel}\n${cardPart}\nConfirmar al: ${reservation.payment_confirm_number}`;
-      }
-    }
+    const handleShare = () => {
+      const numPassengers = reservation.passengers?.length ?? 0;
+      const totalCost = reservation.route_price * numPassengers;
+      const isFullAdvance = reservation.advance >= totalCost;
+      const pendingAmount = totalCost - reservation.advance;
 
-    const msg = [
-      `🧳 *Reservación #${reservation.id} — Viajando*`,
-      ``,
-      `🚌 *Transporte:* ${tc.label}`,
-      `📍 *Ruta:* ${reservation.origin} → ${reservation.destination}`,
-      `📅 *Fecha de viaje:* ${new Date(reservation.travel_date).toLocaleDateString('es-ES')}`,
-      `📅 *Fecha de reserva:* ${new Date(reservation.reservation_date).toLocaleDateString('es-ES')}`,
-      ``,
-      `👥 *Pasajeros (${reservation.passengers?.length ?? 0}):*`,
-      passengerList,
-      ``,
-      `💰 *Precio/pasajero:* ${formatCurrency(reservation.route_price)} CUP`,
-      reservation.advance > 0 ? `✅ *Anticipo:* ${formatCurrency(reservation.advance)} CUP` : '',
-      isFullAdvance ? `🎊 *Pago completo realizado*` : `💳 *Total a pagar:* ${formatCurrency(reservation.total)} CUP`,
-      !isFullAdvance ? paymentLine : '',
-      `📊 *Estado:* ${reservation.status}`,
-    ].filter(Boolean).join('\n');
+      const passengerList = (reservation.passengers ?? []).map((p, i) =>
+        `  ${i + 1}. ${p.full_name} (CI: ${p.identity_card})`
+      ).join('\n');
 
-    const clean = reservation.phone.replace(/\D/g, '');
-    Linking.openURL(`whatsapp://send?phone=53${clean}&text=${encodeURIComponent(msg)}`)
-      .catch(() => Alert.alert('WhatsApp no disponible'));
-  };
+      // Línea de método de pago
+      let paymentLine = '';
+      if (reservation.payment_method && !isFullAdvance) {
+        const bankLabel = BANK_CONFIG[reservation.payment_method as keyof typeof BANK_CONFIG]?.label ?? reservation.payment_method;
 
-  const handleDelete = () => {
-    Alert.alert('Eliminar', '¿Eliminar este pedido?', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Eliminar', style: 'destructive',
-        onPress: async () => {
-          await reservationsRepository.delete(reservation.id);
-          toast.show({ message: 'Pedido eliminado', type: 'success' });
-          setTimeout(() => router.back(), 500);
+        if (reservation.payment_method === 'mitransfer') {
+          paymentLine = `📲 *Pago:* MiTransfer — ${reservation.payment_confirm_number}`;
+        } else {
+          const cardPart = reservation.payment_card_number
+            ? `Tarjeta: \`${reservation.payment_card_number}\``
+            : bankLabel;
+          paymentLine = `💳 *Pago:* ${bankLabel}\n${cardPart}\nConfirmar al: ${reservation.payment_confirm_number}`;
         }
-      },
-    ]);
-  };
+      }
 
-  return (
-    <SafeAreaView style={d.container}>
-      {/* Header */}
-      <View style={d.header}>
-        <TouchableOpacity style={d.backBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={20} color={COLORS.text.primary} />
-        </TouchableOpacity>
-        <Text style={d.title}>Pedido #{reservation.id}</Text>
-        <TouchableOpacity style={d.deleteBtn} onPress={handleDelete}>
-          <Ionicons name="trash-outline" size={18} color={COLORS.accent.danger} />
-        </TouchableOpacity>
-      </View>
+      const msg = [
+        `🧳 *Reservación #${reservation.id} — Viajando*`,
+        ``,
+        `🚌 *Transporte:* ${tc.label}`,
+        `📍 *Ruta:* ${reservation.origin} → ${reservation.destination}`,
+        `📅 *Fecha de viaje:* ${travelParts.d}/${travelParts.m}/${travelParts.y}`,
+        `📅 *Fecha de reserva:* ${resParts.d}/${resParts.m}/${resParts.y}`,
+        ``,
+        `👥 *Pasajeros (${numPassengers}):*`,
+        passengerList,
+        ``,
+        `💰 *Costo Total:* ${formatCurrency(totalCost)} CUP`,
+        reservation.advance > 0 ? `✅ *Anticipo:* ${formatCurrency(reservation.advance)} CUP` : '',
+        isFullAdvance 
+          ? `🎊 *¡Pago completo realizado!*` 
+          : `⚠️ *Pendiente a pagar:* ${formatCurrency(pendingAmount)} CUP`,
+        paymentLine,
+        ``,
+        `📊 *Estado:* ${reservation.status}`,
+      ].filter(Boolean).join('\n');
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={d.content}>
-        {/* Hero card */}
-        <View style={[d.heroCard, { borderColor: tc.color + '44' }]}>
-          <View style={d.heroTop}>
-            <View style={[d.transportBadge, { backgroundColor: tc.color + '1A' }]}>
-              <Ionicons name={tc.icon as any} size={16} color={tc.color} />
-              <Text style={[d.transportLabel, { color: tc.color }]}>{tc.label}</Text>
+      const clean = reservation.phone.replace(/\D/g, '');
+      Linking.openURL(`whatsapp://send?phone=53${clean}&text=${encodeURIComponent(msg)}`)
+        .catch(() => Alert.alert('WhatsApp no disponible'));
+    };
+
+    const handleDelete = () => {
+      Alert.alert('Eliminar', '¿Eliminar este pedido?', [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar', style: 'destructive',
+          onPress: async () => {
+            await reservationsRepository.delete(reservation.id);
+            toast.show({ message: 'Pedido eliminado', type: 'success' });
+            setTimeout(() => router.back(), 500);
+          }
+        },
+      ]);
+    };
+
+    return (
+      <SafeAreaView style={d.container}>
+        {/* Header */}
+        <View style={d.header}>
+          <TouchableOpacity style={d.backBtn} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={20} color={COLORS.text.primary} />
+          </TouchableOpacity>
+          <Text style={d.title}>Pedido #{reservation.id}</Text>
+          <TouchableOpacity style={d.deleteBtn} onPress={handleDelete}>
+            <Ionicons name="trash-outline" size={18} color={COLORS.accent.danger} />
+          </TouchableOpacity>
+        </View>
+  
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={d.content}>
+          {/* Hero card */}
+          <View style={[d.heroCard, { borderColor: tc.color + '44' }]}>
+            <View style={d.heroTop}>
+              <View style={[d.transportBadge, { backgroundColor: tc.color + '1A' }]}>
+                <Ionicons name={tc.icon as any} size={16} color={tc.color} />
+                <Text style={[d.transportLabel, { color: tc.color }]}>{tc.label}</Text>
+              </View>
+              <View style={d.statusBadge}>
+                <View style={[d.statusDot, { backgroundColor: COLORS.accent.warning }]} />
+                <Text style={d.statusText}>{reservation.status}</Text>
+              </View>
             </View>
-            <View style={d.statusBadge}>
-              <View style={[d.statusDot, { backgroundColor: COLORS.accent.warning }]} />
-              <Text style={d.statusText}>{reservation.status}</Text>
+            <View style={d.routeHero}>
+              <Text style={d.cityHero}>{reservation.origin}</Text>
+              <View style={[d.heroLine, { backgroundColor: tc.color + '55' }]}>
+                <Ionicons name={tc.icon as any} size={18} color={tc.color} />
+              </View>
+              <Text style={d.cityHero}>{reservation.destination}</Text>
             </View>
           </View>
-          <View style={d.routeHero}>
-            <Text style={d.cityHero}>{reservation.origin}</Text>
-            <View style={[d.heroLine, { backgroundColor: tc.color + '55' }]}>
-              <Ionicons name={tc.icon as any} size={18} color={tc.color} />
-            </View>
-            <Text style={d.cityHero}>{reservation.destination}</Text>
+  
+          {/* Info */}
+          <View style={d.section}>
+            <Text style={d.sectionTitle}>Información del cliente</Text>
+            <InfoRow icon="call" label="Teléfono" value={reservation.phone} color={tc.color} />
+            <InfoRow icon="airplane" label="Fecha de viaje" value={`${travelParts.weekday}, ${travelParts.d} de ${travelParts.monthLong} de ${travelParts.y}`} color={tc.color} />
+            <InfoRow icon="calendar" label="Fecha de reserva" value={`${resParts.d} de ${resParts.monthLong} de ${resParts.y}`} color={tc.color} />
           </View>
-        </View>
-
-        {/* Info */}
-        <View style={d.section}>
-          <Text style={d.sectionTitle}>Información del cliente</Text>
-          <InfoRow icon="call" label="Teléfono" value={reservation.phone} color={tc.color} />
-          <InfoRow icon="airplane" label="Fecha de viaje" value={new Date(reservation.travel_date).toLocaleDateString('es-ES', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })} color={tc.color} />
-          <InfoRow icon="calendar" label="Fecha de reserva" value={new Date(reservation.reservation_date).toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })} color={tc.color} />
-        </View>
 
         {/* Pasajeros */}
         <View style={d.section}>

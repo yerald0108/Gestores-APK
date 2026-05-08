@@ -20,6 +20,7 @@ import PaymentMethodSelector, { PaymentSelection } from '@/components/PaymentMet
 import { BANK_CONFIG, userProfileService } from '@/services/userProfileService';
 import { useGlobalToast } from '@/components/ui/Toast';
 import AnimatedSwitch from '@/components/ui/AnimatedSwitch';
+import { parseISODate, formatISODate } from '@/utils/dateUtils';
 
 // ── Modal selector genérico ─────────────────────────────────────────────────
 function ListSelectorModal<T>({ visible, title, subtitle, items, selected, renderItem, keyExtractor, onClose, searchable, searchExtract }: {
@@ -239,25 +240,6 @@ const pc = StyleSheet.create({
   hint: { fontSize: FONT.sizes.xs, color: COLORS.accent.warning },
 });
 
-// ── Helpers de fecha ────────────────────────────────────────────────────────
-function formatDateDisplay(date: Date): string {
-  const d = date.getDate().toString().padStart(2, '0');
-  const m = (date.getMonth() + 1).toString().padStart(2, '0');
-  const y = date.getFullYear();
-  return `${d}/${m}/${y}`;
-}
-
-function formatDateISO(date: Date): string {
-  const d = date.getDate().toString().padStart(2, '0');
-  const m = (date.getMonth() + 1).toString().padStart(2, '0');
-  const y = date.getFullYear();
-  return `${y}-${m}-${d}`;
-}
-
-function isoToDate(iso: string): Date {
-  const [y, m, d] = iso.split('-').map(Number);
-  return new Date(y, m - 1, d);
-}
 
 // ── Sección header ──────────────────────────────────────────────────────────
 function SectionHeader({ icon, label, color }: { icon: string; label: string; color: string }) {
@@ -330,8 +312,8 @@ export default function AddReservationScreen() {
         setTransport(r.transport);
         setOrigin(r.origin);
         setDestination(r.destination);
-        setTravelDate(isoToDate(r.travel_date));
-        setReservationDate(isoToDate(r.reservation_date));
+        setTravelDate(parseISODate(r.travel_date));
+        setReservationDate(parseISODate(r.reservation_date));
         setPassengers(r.passengers ?? [{ full_name: '', identity_card: '' }]);
         if (r.advance > 0) {
           setAdvanceEnabled(true);
@@ -460,8 +442,8 @@ export default function AddReservationScreen() {
     }
     setLoading(true);
     try {
-      const travelISO = formatDateISO(travelDate!);
-      const reservationISO = formatDateISO(reservationDate!);
+      const travelISO = formatISODate(travelDate!);
+      const reservationISO = formatISODate(reservationDate!);
       const finalIsGestor = isReserved ? (isGestor ? 1 : 0) : 0;
       const finalGestorCost = isReserved && isGestor ? gestorCostNum : 0;
       const finalAppCost = appPrice;
@@ -676,7 +658,7 @@ export default function AddReservationScreen() {
                 <Ionicons name="calendar" size={16} color={accentColor} />
               </View>
               <Text style={[s.selText, !reservationDate && s.placeholder]}>
-                {reservationDate ? formatDateDisplay(reservationDate) : 'Selecciona la fecha de reserva'}
+                {reservationDate ? formatISODate(reservationDate).split('-').reverse().join('/') : 'Selecciona la fecha de reserva'}
               </Text>
               {reservationDate
                 ? <Ionicons name="checkmark-circle" size={18} color={COLORS.accent.success} />
@@ -695,7 +677,7 @@ export default function AddReservationScreen() {
                 <Ionicons name="calendar" size={16} color={accentColor} />
               </View>
               <Text style={[s.selText, !travelDate && s.placeholder]}>
-                {travelDate ? formatDateDisplay(travelDate) : 'Selecciona la fecha de viaje'}
+                {travelDate ? formatISODate(travelDate).split('-').reverse().join('/') : 'Selecciona la fecha de viaje'}
               </Text>
               {travelDate
                 ? <Ionicons name="checkmark-circle" size={18} color={COLORS.accent.success} />

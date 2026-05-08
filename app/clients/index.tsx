@@ -11,10 +11,10 @@ import { reservationsRepository } from '@/database/reservationsRepository';
 import { Reservation, calcFinancials, formatCurrency } from '@/types';
 import Skeleton from '@/components/ui/Skeleton';
 import { useGlobalToast } from '@/components/ui/Toast';
+import { formatDateDisplay } from '@/utils/dateUtils';
 
 function formatDate(dateStr: string) {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+  return formatDateDisplay(dateStr);
 }
 
 // ── Fila de dato financiero ──────────────────────────────────────────────────
