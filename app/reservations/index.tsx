@@ -24,13 +24,13 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 function ReservationCard({ item, onPress, onEdit, onWhatsApp, onDelete }: any) {
   const tc = TRANSPORT_CONFIG[item.transport as keyof typeof TRANSPORT_CONFIG];
   const passengerCount = item.passengers?.length ?? 0;
-  
+
   const scale = useRef(new Animated.Value(1)).current;
-  
+
   const handlePressIn = () => {
     Animated.spring(scale, { toValue: 0.97, useNativeDriver: true, damping: 20, stiffness: 300 }).start();
   };
-  
+
   const handlePressOut = () => {
     Animated.spring(scale, { toValue: 1, useNativeDriver: true, damping: 20, stiffness: 300 }).start();
   };
@@ -131,7 +131,7 @@ export default function ReservationsScreen() {
   const filteredReservations = useMemo(() => {
     if (!search.trim()) return reservations;
     const lower = search.toLowerCase();
-    return reservations.filter(r => 
+    return reservations.filter(r =>
       r.origin.toLowerCase().includes(lower) ||
       r.destination.toLowerCase().includes(lower) ||
       r.phone.includes(lower) ||
@@ -142,13 +142,13 @@ export default function ReservationsScreen() {
   const handleDelete = (r: Reservation) => {
     Alert.alert('Eliminar pedido', `¿Eliminar el pedido #${r.id}?`, [
       { text: 'Cancelar', style: 'cancel' },
-      { 
-        text: 'Eliminar', style: 'destructive', 
-        onPress: async () => { 
-          await reservationsRepository.delete(r.id); 
+      {
+        text: 'Eliminar', style: 'destructive',
+        onPress: async () => {
+          await reservationsRepository.delete(r.id);
           toast.show({ message: 'Pedido eliminado', type: 'success' });
-          load(); 
-        } 
+          load();
+        }
       },
     ]);
   };
@@ -159,22 +159,22 @@ export default function ReservationsScreen() {
       `  ${i + 1}. ${p.full_name} (CI: ${p.identity_card})`
     ).join('\n');
     const passengerCount = item.passengers?.length ?? 0;
+    const totalCost = item.route_price * passengerCount;
+    const isFullAdvance = item.advance >= totalCost;
+    const pendingAmount = Math.max(0, totalCost - item.advance);
 
     // Línea de método de pago
     let paymentLine = '';
-    const isFullAdvance = item.advance === item.route_price;
-
     if (item.payment_method) {
       const bankLabel = BANK_CONFIG[item.payment_method as keyof typeof BANK_CONFIG]?.label ?? item.payment_method;
 
       if (item.payment_method === 'mitransfer') {
         paymentLine = `📲 *Pago:* MiTransfer — ${item.payment_confirm_number}`;
       } else {
-        // Número completo para que el cliente lo copie directamente
         const cardPart = (item.payment_card_number && !isFullAdvance)
           ? `Tarjeta: \`${item.payment_card_number}\``
           : bankLabel;
-        
+
         paymentLine = isFullAdvance
           ? `💳 *Pago:* ${bankLabel}`
           : `💳 *Pago:* ${bankLabel}\n${cardPart}\nConfirmar al: ${item.payment_confirm_number}`;
@@ -185,7 +185,7 @@ export default function ReservationsScreen() {
     const resParts = getSafeDateParts(item.reservation_date);
 
     const msg = [
-      `🧳 *Pedido #${item.id} — Viajando*`,
+      `🧳 *Resumen de su pedido*`,
       ``,
       `🚌 *Transporte:* ${tc.label}`,
       `📍 *Ruta:* ${item.origin} → ${item.destination}`,
@@ -195,9 +195,11 @@ export default function ReservationsScreen() {
       `👥 *Pasajeros (${passengerCount}):*`,
       passengerList,
       ``,
-      `💰 *Precio/pasajero:* ${formatCurrency(item.route_price)} CUP`,
+      `💰 *Costo Total:* ${formatCurrency(totalCost)} CUP`,
       item.advance > 0 ? `✅ *Anticipo:* ${formatCurrency(item.advance)} CUP` : '',
-      isFullAdvance ? `🎊 *Pago completo realizado*` : `💳 *Total a pagar:* ${formatCurrency(item.total)} CUP`,
+      isFullAdvance
+        ? `🎊 *¡Pago completo realizado!*`
+        : `⚠️ *Pendiente a pagar:* ${formatCurrency(pendingAmount)} CUP`,
       !isFullAdvance ? paymentLine : '',
     ].filter(Boolean).join('\n');
     const clean = item.phone.replace(/\D/g, '');
