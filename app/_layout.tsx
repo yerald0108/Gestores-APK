@@ -7,6 +7,7 @@ import { ThemeProvider, DarkTheme } from '@react-navigation/native';
 import { getDatabase } from '@/database/db';
 import { ToastProvider } from '@/components/ui/Toast';
 import { COLORS } from '@/constants/theme';
+import { notificationService } from '@/services/notificationService';
 
 const CustomTheme = {
   ...DarkTheme,
@@ -23,9 +24,17 @@ export default function RootLayout() {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    getDatabase()
-      .then(() => setIsReady(true))
-      .catch(console.error);
+    const init = async () => {
+      try {
+        await getDatabase();
+        await notificationService.requestPermissions();
+      } catch (err) {
+        console.error('Error initialization:', err);
+      } finally {
+        setIsReady(true);
+      }
+    };
+    init();
   }, []);
 
   if (!isReady) {

@@ -1,6 +1,7 @@
 import { getDatabase } from './db';
 import { Reservation, CreateReservationDTO, Passenger } from '../types';
 import { parseISODate } from '../utils/dateUtils';
+import { notificationService } from '../services/notificationService';
 
 // ── Helpers internos ──────────────────────────────────────────────────────────
 
@@ -100,7 +101,60 @@ export const reservationsRepository = {
         [reservationId, p.full_name, p.identity_card]
       );
     }
-    return (await this.getById(reservationId))!;
+    
+    const created = (await this.getById(reservationId))!;
+    if (created.status === 'Reservado') {
+      await notificationService.scheduleTripReminder(created);
+    }
+    return created;
+  },
+
+  async update(id: number, data: Partial<CreateReservationDTO>): Promise<Reservation> {
+    const db = await getDatabase();
+    const sets: string[] = [];
+    const params: any[] = [];
+
+    const fields = [
+      'phone', 'transport', 'origin', 'destination', 'route_price',
+      'travel_date', 'reservation_date', 'advance', 'total', 'status',
+      'is_gestor', 'gestor_cost_per_passenger', 'app_cost_per_passenger',
+      'payment_method', 'payment_confirm_number', 'payment_card_number'
+    ];
+
+    for (const field of fields) {
+      if (data[field as keyof CreateReservationDTO] !== undefined) {
+        sets.push(`${field} = ?`);
+        params.push(data[field as keyof CreateReservationDTO]);
+      }
+    }
+
+    if (sets.length > 0) {
+      sets.push(`updated_at = ?`);
+      params.push(new Date().toISOString());
+      
+      await db.runAsync(
+        `UPDATE reservations SET ${sets.join(', ')} WHERE id = ?`,
+        [...params, id]
+      );
+    }
+
+    if (data.passengers) {
+      await db.runAsync('DELETE FROM passengers WHERE reservation_id = ?', [id]);
+      for (const p of data.passengers) {
+        await db.runAsync(
+          'INSERT INTO passengers (reservation_id, full_name, identity_card) VALUES (?, ?, ?)',
+          [id, p.full_name, p.identity_card]
+        );
+      }
+    }
+
+    const updated = (await this.getById(id))!;
+    if (updated.status === 'Reservado') {
+      await notificationService.scheduleTripReminder(updated);
+    } else {
+      await notificationService.cancelTripReminder(id);
+    }
+    return updated;
   },
 
   async updateStatus(id: number, status: string): Promise<void> {
@@ -109,6 +163,15 @@ export const reservationsRepository = {
       'UPDATE reservations SET status = ?, updated_at = ? WHERE id = ?',
       [status, new Date().toISOString(), id]
     );
+    
+    const updated = await this.getById(id);
+    if (updated) {
+      if (status === 'Reservado') {
+        await notificationService.scheduleTripReminder(updated);
+      } else {
+        await notificationService.cancelTripReminder(id);
+      }
+    }
   },
 
   async markAsReserved(
@@ -134,11 +197,17 @@ export const reservationsRepository = {
         id,
       ]
     );
+    
+    const updated = await this.getById(id);
+    if (updated) {
+      await notificationService.scheduleTripReminder(updated);
+    }
   },
 
   async delete(id: number): Promise<void> {
     const db = await getDatabase();
     await db.runAsync('DELETE FROM reservations WHERE id = ?', [id]);
+    await notificationService.cancelTripReminder(id);
   },
 
   // ── Estadísticas para reportes ──────────────────────────────────────────

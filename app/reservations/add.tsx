@@ -482,29 +482,25 @@ export default function AddReservationScreen() {
       const finalPaymentCardNumber = paymentSelection?.card.cardNumber ?? '';
 
       if (isEditing) {
-        const db = await getDatabase();
-        await db.runAsync(
-          `UPDATE reservations SET phone=?, transport=?, origin=?, destination=?,
-          route_price=?, travel_date=?, reservation_date=?, advance=?, total=?,
-          status=?, is_gestor=?, gestor_cost_per_passenger=?, app_cost_per_passenger=?,
-          payment_method=?, payment_confirm_number=?, payment_card_number=?,
-          updated_at=?
-          WHERE id=?`,
-          [phone.trim(), transport, origin, destination, routePrice,
-            travelISO, reservationISO, advanceNum, total,
-          isReserved ? 'Reservado' : 'Pendiente',
-            finalIsGestor, finalGestorCost, finalAppCost,
-            finalPaymentMethod, finalPaymentConfirm, finalPaymentCardNumber,
-          new Date().toISOString(),
-          Number(editId)]
-        );
-        await db.runAsync('DELETE FROM passengers WHERE reservation_id = ?', [Number(editId)]);
-        for (const p of passengers) {
-          await db.runAsync(
-            'INSERT INTO passengers (reservation_id, full_name, identity_card) VALUES (?, ?, ?)',
-            [Number(editId), p.full_name, p.identity_card]
-          );
-        }
+        await reservationsRepository.update(Number(editId), {
+          phone: phone.trim(),
+          transport: transport as TransportType,
+          origin,
+          destination,
+          route_price: routePrice,
+          travel_date: travelISO,
+          reservation_date: reservationISO,
+          advance: advanceNum,
+          total,
+          status: isReserved ? 'Reservado' : 'Pendiente',
+          is_gestor: finalIsGestor,
+          gestor_cost_per_passenger: finalGestorCost,
+          app_cost_per_passenger: finalAppCost,
+          payment_method: finalPaymentMethod,
+          payment_confirm_number: finalPaymentConfirm,
+          payment_card_number: finalPaymentCardNumber,
+          passengers
+        });
       } else {
         await reservationsRepository.create({
           phone: phone.trim(),
