@@ -309,6 +309,7 @@ export default function ClientsScreen() {
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
       const data = await reservationsRepository.getReserved();
+      data.sort((a, b) => new Date(a.travel_date).getTime() - new Date(b.travel_date).getTime());
       setReservations(data);
     } catch {
       Alert.alert('Error', 'No se pudieron cargar las reservas');
@@ -346,9 +347,14 @@ export default function ClientsScreen() {
       {
         text: 'Eliminar', style: 'destructive',
         onPress: async () => { 
-          await reservationsRepository.delete(r.id); 
-          toast.show({ message: 'Reserva eliminada', type: 'success' });
-          load(); 
+          try {
+            await reservationsRepository.delete(r.id); 
+            toast.show({ message: 'Reserva eliminada', type: 'success' });
+            load(); 
+          } catch (err) {
+            console.error('Error al eliminar reserva:', err);
+            Alert.alert('Error', 'No se pudo eliminar la reserva. Intenta de nuevo.');
+          }
         }
       },
     ]);
@@ -367,8 +373,8 @@ export default function ClientsScreen() {
         </View>
       </View>
 
-      {/* Buscador */}
-      {reservations.length > 0 && (
+      {/* Buscador — Visible si hay datos o ya hay búsqueda activa */}
+      {(reservations.length > 0 || search.length > 0) && (
         <View style={s.searchContainer}>
           <View style={s.searchBar}>
             <Ionicons name="search" size={20} color={COLORS.text.muted} />

@@ -120,8 +120,7 @@ export function calcFinancials(r: Reservation): ReservationFinancials {
 export function formatCurrency(value: number | string): string {
   const num = typeof value === 'string' ? parseFloat(value) : value;
   if (isNaN(num)) return '0.00';
-  return num.toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+  
+  // Formato: 1,234.56 (estándar común en banca cubana)
+  return num.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
 }

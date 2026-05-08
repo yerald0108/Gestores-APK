@@ -194,8 +194,6 @@ export const reservationsRepository = {
     { label: string; ganancia: number; pasajeros: number; reservas: number }[]
   > {
     const db = await getDatabase();
-
-    // Traemos todas las reservadas con pasajeros
     const rows = await db.getAllAsync<any>(
       `SELECT r.reservation_date, r.route_price, r.is_gestor,
               r.gestor_cost_per_passenger, r.app_cost_per_passenger,
@@ -207,44 +205,62 @@ export const reservationsRepository = {
        ORDER BY r.reservation_date ASC`
     );
 
-    // Agrupamos en JS según el período
-    const map = new Map<string, { ganancia: number; pasajeros: number; reservas: number }>();
+    const dataMap = new Map<string, { ganancia: number; pasajeros: number; reservas: number }>();
 
+    // Procesar datos de la BD
     for (const r of rows) {
       const date = parseISODate(r.reservation_date);
-      let label = '';
+      let key = '';
 
       if (period === 'day') {
-        // Últimos 14 días — label: "DD/MM"
-        label = `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}`;
+        key = `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}`;
       } else if (period === 'week') {
-        // Semana del año — label: "Sem N"
         const start = new Date(date);
         start.setDate(date.getDate() - date.getDay());
-        label = `${String(start.getDate()).padStart(2, '0')}/${String(start.getMonth() + 1).padStart(2, '0')}`;
+        key = `${String(start.getDate()).padStart(2, '0')}/${String(start.getMonth() + 1).padStart(2, '0')}`;
       } else {
-        // Mes — label: "Ene 25"
         const months = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-        label = `${months[date.getMonth()]} ${String(date.getFullYear()).slice(2)}`;
+        key = `${months[date.getMonth()]} ${String(date.getFullYear()).slice(2)}`;
       }
 
       const pax = r.pax ?? 0;
       const ingresos = r.route_price * pax;
-      const costo = r.is_gestor === 1
-        ? r.gestor_cost_per_passenger * pax
-        : r.app_cost_per_passenger * pax;
+      const costo = r.is_gestor === 1 ? r.gestor_cost_per_passenger * pax : r.app_cost_per_passenger * pax;
       const ganancia = ingresos - costo;
 
-      if (!map.has(label)) map.set(label, { ganancia: 0, pasajeros: 0, reservas: 0 });
-      const entry = map.get(label)!;
+      if (!dataMap.has(key)) dataMap.set(key, { ganancia: 0, pasajeros: 0, reservas: 0 });
+      const entry = dataMap.get(key)!;
       entry.ganancia += ganancia;
       entry.pasajeros += pax;
       entry.reservas += 1;
     }
 
-    // Limitamos a los últimos N períodos según tipo
+    // Generar secuencia temporal completa para rellenar huecos
+    const result: { label: string; ganancia: number; pasajeros: number; reservas: number }[] = [];
+    const now = new Date();
     const limit = period === 'day' ? 14 : period === 'week' ? 8 : 6;
-    const all = Array.from(map.entries()).map(([label, v]) => ({ label, ...v }));
-    return all.slice(-limit);
+
+    for (let i = limit - 1; i >= 0; i--) {
+      let label = '';
+      const d = new Date(now);
+
+      if (period === 'day') {
+        d.setDate(now.getDate() - i);
+        label = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+      } else if (period === 'week') {
+        d.setDate(now.getDate() - (i * 7));
+        d.setDate(d.getDate() - d.getDay()); // Inicio de semana
+        label = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+      } else {
+        d.setMonth(now.getMonth() - i);
+        const months = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+        label = `${months[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`;
+      }
+
+      const stats = dataMap.get(label) || { ganancia: 0, pasajeros: 0, reservas: 0 };
+      result.push({ label, ...stats });
+    }
+
+    return result;
   },
 };

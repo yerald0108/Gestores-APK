@@ -1,8 +1,8 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { View } from 'react-native';
+import { View, ActivityIndicator } from 'react-native';
 import { ThemeProvider, DarkTheme } from '@react-navigation/native';
 import { getDatabase } from '@/database/db';
 import { ToastProvider } from '@/components/ui/Toast';
@@ -20,9 +20,21 @@ const CustomTheme = {
 };
 
 export default function RootLayout() {
+  const [isReady, setIsReady] = useState(false);
+
   useEffect(() => {
-    getDatabase().catch(console.error);
+    getDatabase()
+      .then(() => setIsReady(true))
+      .catch(console.error);
   }, []);
+
+  if (!isReady) {
+    return (
+      <View style={{ flex: 1, backgroundColor: COLORS.bg.primary, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={COLORS.accent.primary} />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaProvider>

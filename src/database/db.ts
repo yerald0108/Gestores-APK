@@ -54,6 +54,7 @@ const initializeDatabase = async (database: SQLite.SQLiteDatabase): Promise<void
     );
 
     CREATE INDEX IF NOT EXISTS idx_routes_transport ON routes(transport);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_routes_unique ON routes(transport, origin, destination);
     CREATE INDEX IF NOT EXISTS idx_reservations_status ON reservations(status);
     CREATE INDEX IF NOT EXISTS idx_passengers_reservation ON passengers(reservation_id);
   `);

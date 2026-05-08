@@ -1,25 +1,31 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet } from 'react-native';
+import { Animated, StyleSheet, TouchableOpacity } from 'react-native';
 import { COLORS } from '@/constants/theme';
 
 interface Props {
   value: boolean;
-  /** Active track color (matches the accent color of the parent toggle row) */
+  onToggle?: (val: boolean) => void;
   color: string;
+  size?: 'standard' | 'sm';
 }
 
 /**
  * Drop-in replacement for the static switch View used in add.tsx.
  * Animates both the thumb position and the track background color.
  */
-export default function AnimatedSwitch({ value, color }: Props) {
-  const thumbPos = useRef(new Animated.Value(value ? 18 : 2)).current;
+export default function AnimatedSwitch({ value, onToggle, color, size = 'standard' }: Props) {
+  const isSm = size === 'sm';
+  const trackW = isSm ? 32 : 42;
+  const thumbSize = isSm ? 16 : 20;
+  const activePos = trackW - thumbSize - 2;
+  
+  const thumbPos = useRef(new Animated.Value(value ? activePos : 2)).current;
   const bgAnim = useRef(new Animated.Value(value ? 1 : 0)).current;
 
   useEffect(() => {
     Animated.parallel([
       Animated.spring(thumbPos, {
-        toValue: value ? 18 : 2,
+        toValue: value ? activePos : 2,
         useNativeDriver: true,
         damping: 16,
         stiffness: 220,
@@ -28,23 +34,37 @@ export default function AnimatedSwitch({ value, color }: Props) {
       Animated.timing(bgAnim, {
         toValue: value ? 1 : 0,
         duration: 180,
-        useNativeDriver: false, // backgroundColor cannot use native driver
+        useNativeDriver: false,
       }),
     ]).start();
-  }, [value]);
+  }, [value, activePos]);
+
+  const handlePress = () => {
+    if (onToggle) onToggle(!value);
+  };
 
   const trackColor = bgAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [COLORS.bg.elevated, color],
   });
 
-  return (
-    <Animated.View style={[styles.track, { backgroundColor: trackColor }]}>
+  const Content = (
+    <Animated.View style={[styles.track, { backgroundColor: trackColor, width: trackW, height: isSm ? 20 : 24, borderRadius: isSm ? 10 : 12 }]}>
       <Animated.View
-        style={[styles.thumb, { transform: [{ translateX: thumbPos }] }]}
+        style={[styles.thumb, { transform: [{ translateX: thumbPos }], width: thumbSize, height: thumbSize, borderRadius: thumbSize / 2 }]}
       />
     </Animated.View>
   );
+
+  if (onToggle) {
+    return (
+      <TouchableOpacity activeOpacity={0.8} onPress={handlePress}>
+        {Content}
+      </TouchableOpacity>
+    );
+  }
+
+  return Content;
 }
 
 const styles = StyleSheet.create({

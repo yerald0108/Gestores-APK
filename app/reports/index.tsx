@@ -10,6 +10,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, FONT, RADIUS } from '@/constants/theme';
 import { reservationsRepository } from '@/database/reservationsRepository';
+import Skeleton from '@/components/ui/Skeleton';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const CHART_W = SCREEN_W - SPACING.lg * 2 - SPACING.md * 2; // padding del contenedor
@@ -107,7 +108,7 @@ function BarChart({
   );
 }
 
-// ── Gráfico de líneas ──────────────────────────────────────────────────────
+// ── Gráfico de líneas (CORREGIDO: Sin transformOrigin) ─────────────────────
 function LineChart({
   data,
   valueKey,
@@ -127,8 +128,6 @@ function LineChart({
   const [selected, setSelected] = useState<number | null>(null);
 
   const getY = (v: number) => CHART_H - ((v - minVal) / range) * (CHART_H - 16) - 8;
-
-  // Construir path SVG-like pero con View absolutos para RN
   const points = values.map((v, i) => ({ x: i * stepX, y: getY(v) }));
 
   return (
@@ -155,13 +154,12 @@ function LineChart({
               key={i}
               style={{
                 position: 'absolute',
-                left: pt.x,
-                top: pt.y,
+                left: (pt.x + next.x) / 2 - len / 2,
+                top: (pt.y + next.y) / 2 - 1,
                 width: len,
                 height: 2,
                 backgroundColor: color + 'AA',
                 transform: [{ rotate: `${angle}deg` }],
-                transformOrigin: '0 0',
               }}
             />
           );
@@ -184,6 +182,7 @@ function LineChart({
                 backgroundColor: isSel ? color : color + 'DD',
                 borderWidth: isSel ? 2 : 0,
                 borderColor: '#fff',
+                zIndex: 5,
               }}
             />
           );
@@ -407,6 +406,7 @@ export default function ReportsScreen() {
   const [global, setGlobal] = useState<GlobalStats | null>(null);
   const [periodData, setPeriodData] = useState<PeriodData[]>([]);
   const [loading, setLoading] = useState(true);
+  const lastLoadedPeriod = React.useRef<Period | null>(null);
 
   const load = useCallback(async (p: Period) => {
     try {
@@ -417,6 +417,7 @@ export default function ReportsScreen() {
       ]);
       setGlobal(g);
       setPeriodData(pd);
+      lastLoadedPeriod.current = p;
     } catch (err) {
       console.error('[ReportsScreen] Error al cargar estadísticas:', err);
       Alert.alert('Error', 'No se pudieron cargar los reportes. Intenta de nuevo.');
@@ -425,9 +426,14 @@ export default function ReportsScreen() {
     }
   }, []);
 
-  // useFocusEffect recarga al volver a la pantalla Y cuando cambia el período.
-  // No se necesita un useEffect adicional para 'period' — haría una doble carga.
-  useFocusEffect(useCallback(() => { load(period); }, [period]));
+  // Recarga cuando cambia el período o cuando la pantalla gana el foco (si el período cambió fuera o es la primera vez)
+  useFocusEffect(
+    useCallback(() => {
+      if (lastLoadedPeriod.current !== period) {
+        load(period);
+      }
+    }, [period, load])
+  );
 
   const periodLabel = period === 'day' ? 'últimos 14 días' : period === 'week' ? 'últimas 8 semanas' : 'últimos 6 meses';
 
@@ -445,9 +451,19 @@ export default function ReportsScreen() {
       </View>
 
       {loading ? (
-        <View style={s.centered}>
-          <ActivityIndicator color={COLORS.accent.primary} size="large" />
-        </View>
+        <ScrollView contentContainerStyle={s.content}>
+          <View style={s.kpiGrid}>
+            <Skeleton height={100} borderRadius={RADIUS.xl} style={{ flex: 1 }} />
+            <Skeleton height={100} borderRadius={RADIUS.xl} style={{ flex: 1 }} />
+          </View>
+          <View style={s.kpiGrid}>
+            <Skeleton height={100} borderRadius={RADIUS.xl} style={{ flex: 1 }} />
+            <Skeleton height={100} borderRadius={RADIUS.xl} style={{ flex: 1 }} />
+          </View>
+          <Skeleton height={50} borderRadius={RADIUS.full} />
+          <Skeleton height={250} borderRadius={RADIUS.xl} />
+          <Skeleton height={250} borderRadius={RADIUS.xl} />
+        </ScrollView>
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.content}>
 

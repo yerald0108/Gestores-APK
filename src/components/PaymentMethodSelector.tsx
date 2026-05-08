@@ -34,7 +34,7 @@ export default function PaymentMethodSelector({ visible, onSelect, onClose }: Pr
   // PanResponder para el gesto de deslizar hacia abajo
   const panResponder = React.useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_, gestureState) => {
         return gestureState.dy > 5;
       },

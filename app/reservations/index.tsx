@@ -86,6 +86,25 @@ function ReservationCard({ item, onPress, onEdit, onWhatsApp, onDelete }: any) {
           </Text>
         </View>
 
+        {/* Indicador de urgencia */}
+        {(() => {
+          const travelDate = new Date(item.travel_date);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const diffTime = travelDate.getTime() - today.getTime();
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          
+          if (diffDays <= 3 && diffDays >= 0) {
+            return (
+              <View style={s.urgencyBadge}>
+                <Ionicons name="flash" size={10} color="#fff" />
+                <Text style={s.urgencyText}>{diffDays === 0 ? 'Hoy' : `En ${diffDays} d`}</Text>
+              </View>
+            );
+          }
+          return null;
+        })()}
+
         <View style={s.actionsGroup}>
           <TouchableOpacity style={s.actionBtn} onPress={onEdit}>
             <Ionicons name="pencil" size={16} color={COLORS.accent.primary} />
@@ -116,7 +135,9 @@ export default function ReservationsScreen() {
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
       // Solo carga los pedidos pendientes — los reservados van a /clients
+      // Ordenados por fecha de viaje (más cercanos primero)
       const data = await reservationsRepository.getPending();
+      data.sort((a, b) => new Date(a.travel_date).getTime() - new Date(b.travel_date).getTime());
       setReservations(data);
     } catch {
       Alert.alert('Error', 'No se pudieron cargar los pedidos');
@@ -145,9 +166,14 @@ export default function ReservationsScreen() {
       {
         text: 'Eliminar', style: 'destructive',
         onPress: async () => {
-          await reservationsRepository.delete(r.id);
-          toast.show({ message: 'Pedido eliminado', type: 'success' });
-          load();
+          try {
+            await reservationsRepository.delete(r.id);
+            toast.show({ message: 'Pedido eliminado', type: 'success' });
+            load();
+          } catch (err) {
+            console.error('Error al eliminar pedido:', err);
+            Alert.alert('Error', 'No se pudo eliminar el pedido. Intenta de nuevo.');
+          }
         }
       },
     ]);
@@ -226,8 +252,8 @@ export default function ReservationsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Barra de búsqueda */}
-      {reservations.length > 0 && (
+      {/* Barra de búsqueda — Visible si hay datos o si ya hay una búsqueda activa */}
+      {(reservations.length > 0 || search.length > 0) && (
         <View style={s.searchContainer}>
           <View style={s.searchBar}>
             <Ionicons name="search" size={20} color={COLORS.text.muted} />
@@ -349,4 +375,6 @@ const s = StyleSheet.create({
   },
   whatsappBtn: { backgroundColor: '#25D36622', borderColor: '#25D36655' },
   deleteBtn: { backgroundColor: COLORS.accent.danger + '1A', borderColor: COLORS.accent.danger + '55' },
+  urgencyBadge: { position: 'absolute', right: 110, top: -10, backgroundColor: COLORS.accent.danger, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 2, zIndex: 10 },
+  urgencyText: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
 });
