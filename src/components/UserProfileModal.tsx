@@ -8,7 +8,7 @@ import { COLORS, SPACING, FONT, RADIUS } from '@/constants/theme';
 import {
   userProfileService, UserProfile, BankCard, BankType, BANK_CONFIG,
 } from '@/services/userProfileService';
-import { useGlobalToast } from '@/components/ui/Toast';
+import Toast, { useToast, useGlobalToast } from '@/components/ui/Toast';
 
 // ── Selector de banco ──────────────────────────────────────────────────────
 function BankSelector({ selected, onSelect }: {
@@ -87,46 +87,63 @@ function AddCardForm({ initialData, onAdd, onCancel }: {
   onCancel: () => void;
 }) {
   const [bank, setBank] = useState<BankType | null>(initialData?.bank || null);
-  const [number, setNumber] = useState(initialData?.cardNumber ? formatCardNumber(initialData.cardNumber) : '');
+  const [number, setNumber] = useState(initialData?.cardNumber ? formatCardNumber(initialData.cardNumber, initialData.bank) : '');
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (initialData) {
       setBank(initialData.bank);
-      setNumber(formatCardNumber(initialData.cardNumber));
+      setNumber(formatCardNumber(initialData.cardNumber, initialData.bank));
     }
   }, [initialData]);
 
-  function formatCardNumber(v: string) {
+  function formatCardNumber(v: string, b: BankType | null) {
+    if (b === 'mitransfer') return v.replace(/\D/g, '').slice(0, 8);
     const digits = v.replace(/\D/g, '').slice(0, 16);
     return digits.replace(/(.{4})/g, '$1 ').trim();
   }
 
   const handleAdd = () => {
     if (!bank) { setError('Selecciona un banco'); return; }
-    if (number.replace(/\D/g, '').length < 4) { setError('Ingresa al menos 4 dígitos'); return; }
-    onAdd({ bank, cardNumber: number.replace(/\s/g, ''), label: BANK_CONFIG[bank].label });
+    
+    const digits = number.replace(/\D/g, '');
+    const isMT = bank === 'mitransfer';
+    const requiredLen = isMT ? 8 : 16;
+
+    if (digits.length !== requiredLen) {
+      setError(`Debe tener exactamente ${requiredLen} dígitos`);
+      return;
+    }
+
+    onAdd({ bank, cardNumber: digits, label: BANK_CONFIG[bank].label });
     setBank(null);
     setNumber('');
     setError('');
   };
 
+  const isMiTransfer = bank === 'mitransfer';
+
   return (
     <View style={[af.form, { borderColor: bank ? BANK_CONFIG[bank].color + '44' : COLORS.border.default }]}>
       <Text style={af.title}>{initialData ? 'Editar tarjeta' : 'Nueva tarjeta'}</Text>
-      <BankSelector selected={bank} onSelect={(b) => { setBank(b); setError(''); }} />
+      <BankSelector selected={bank} onSelect={(b) => { 
+        setBank(b); 
+        setError(''); 
+        // Limpiamos o formateamos el número si cambia a mitransfer
+        setNumber('');
+      }} />
       <View style={[af.inputRow, error && !bank ? af.inputErr : null]}>
         <View style={[af.iconWrap, { backgroundColor: bank ? BANK_CONFIG[bank].color + '1A' : COLORS.bg.elevated }]}>
           <Ionicons name="card-outline" size={16} color={bank ? BANK_CONFIG[bank].color : COLORS.text.muted} />
         </View>
         <TextInput
           style={af.input}
-          placeholder="Número de tarjeta"
+          placeholder={isMiTransfer ? "Número de teléfono" : "Número de tarjeta"}
           placeholderTextColor={COLORS.text.muted}
           value={number}
-          onChangeText={(v) => { setNumber(formatCardNumber(v)); setError(''); }}
+          onChangeText={(v) => { setNumber(formatCardNumber(v, bank)); setError(''); }}
           keyboardType="numeric"
-          maxLength={19}
+          maxLength={isMiTransfer ? 8 : 19}
         />
       </View>
       {error ? <Text style={af.error}>{error}</Text> : null}
@@ -174,7 +191,8 @@ export default function UserProfileModal({ visible, onClose }: Props) {
   const [showAddCard, setShowAddCard] = useState(false);
   const [editingCard, setEditingCard] = useState<BankCard | null>(null);
   const [saving, setSaving] = useState(false);
-  const toast = useGlobalToast();
+  const localToast = useToast();
+  const globalToast = useGlobalToast();
 
   const [show, setShow] = useState(visible);
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -248,8 +266,12 @@ export default function UserProfileModal({ visible, onClose }: Props) {
     const updated = await userProfileService.updateProfile(name.trim(), phone.trim());
     setProfile(updated);
     setSaving(false);
-    onClose();
-    toast.show({
+    
+    // Cerramos la pestaña inmediatamente
+    closeModal();
+    
+    // Mostramos el aviso fuera (global)
+    globalToast.show({
       message: 'Perfil actualizado correctamente',
       type: 'success',
     });
@@ -259,10 +281,10 @@ export default function UserProfileModal({ visible, onClose }: Props) {
     let updated;
     if (editingCard) {
       updated = await userProfileService.editCard(editingCard.id, card);
-      toast.show({ message: 'Tarjeta actualizada', type: 'success' });
+      localToast.show({ message: 'Tarjeta actualizada', type: 'success' });
     } else {
       updated = await userProfileService.addCard(card);
-      toast.show({ message: 'Tarjeta añadida', type: 'success' });
+      localToast.show({ message: 'Tarjeta añadida', type: 'success' });
     }
     setProfile(updated);
     setShowAddCard(false);
@@ -277,7 +299,7 @@ export default function UserProfileModal({ visible, onClose }: Props) {
         onPress: async () => {
           const updated = await userProfileService.removeCard(cardId);
           setProfile(updated);
-          toast.show({ message: 'Tarjeta eliminada', type: 'success' });
+          localToast.show({ message: 'Tarjeta eliminada', type: 'success' });
         },
       },
     ]);
@@ -410,6 +432,9 @@ export default function UserProfileModal({ visible, onClose }: Props) {
               )}
 
             </ScrollView>
+
+            {/* Toast local dentro del modal */}
+            <Toast toast={localToast.toast} onHide={localToast.hide} bottomOffset={20} />
           </Animated.View>
         </Animated.View>
       </KeyboardAvoidingView>
