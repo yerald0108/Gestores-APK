@@ -104,7 +104,7 @@ export const reservationsRepository = {
     
     const created = (await this.getById(reservationId))!;
     if (created.status === 'Reservado') {
-      await notificationService.scheduleTripReminder(created);
+      notificationService.scheduleTripReminder(created).catch(e => console.error('Error scheduling notification:', e));
     }
     return created;
   },
@@ -150,9 +150,9 @@ export const reservationsRepository = {
 
     const updated = (await this.getById(id))!;
     if (updated.status === 'Reservado') {
-      await notificationService.scheduleTripReminder(updated);
+      notificationService.scheduleTripReminder(updated).catch(e => console.error('Error scheduling notification:', e));
     } else {
-      await notificationService.cancelTripReminder(id);
+      notificationService.cancelTripReminder(id).catch(e => console.error('Error cancelling notification:', e));
     }
     return updated;
   },
@@ -167,9 +167,9 @@ export const reservationsRepository = {
     const updated = await this.getById(id);
     if (updated) {
       if (status === 'Reservado') {
-        await notificationService.scheduleTripReminder(updated);
+        notificationService.scheduleTripReminder(updated).catch(e => console.error('Error scheduling notification:', e));
       } else {
-        await notificationService.cancelTripReminder(id);
+        notificationService.cancelTripReminder(id).catch(e => console.error('Error cancelling notification:', e));
       }
     }
   },
@@ -200,7 +200,7 @@ export const reservationsRepository = {
     
     const updated = await this.getById(id);
     if (updated) {
-      await notificationService.scheduleTripReminder(updated);
+      notificationService.scheduleTripReminder(updated).catch(e => console.error('Error scheduling notification:', e));
     }
   },
 

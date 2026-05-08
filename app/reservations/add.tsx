@@ -181,10 +181,11 @@ const ms = StyleSheet.create({
 });
 
 // ── Tarjeta de pasajero ─────────────────────────────────────────────────────
-function PassengerCard({ index, passenger, color, onChange, onRemove, canRemove }: {
+function PassengerCard({ index, passenger, color, onChange, onRemove, canRemove, nameError, ciError }: {
   index: number; passenger: Passenger; color: string;
   onChange: (field: keyof Passenger, value: string) => void;
   onRemove: () => void; canRemove: boolean;
+  nameError?: string; ciError?: string;
 }) {
   return (
     <View style={[pc.card, { borderColor: color + '33' }]}>
@@ -202,18 +203,19 @@ function PassengerCard({ index, passenger, color, onChange, onRemove, canRemove 
       <View style={pc.field}>
         <Text style={pc.label}>Nombre completo</Text>
         <TextInput
-          style={pc.input}
+          style={[pc.input, nameError ? { borderColor: COLORS.accent.danger } : null]}
           placeholder="Ej: Juan Carlos Pérez López"
           placeholderTextColor={COLORS.text.muted}
           value={passenger.full_name}
           onChangeText={(v) => onChange('full_name', v)}
           autoCapitalize="words"
         />
+        {nameError ? <Text style={pc.errorText}>{nameError}</Text> : null}
       </View>
       <View style={pc.field}>
         <Text style={pc.label}>Carnet de identidad</Text>
         <TextInput
-          style={pc.input}
+          style={[pc.input, ciError ? { borderColor: COLORS.accent.danger } : null]}
           placeholder="11 dígitos"
           placeholderTextColor={COLORS.text.muted}
           value={passenger.identity_card}
@@ -221,7 +223,8 @@ function PassengerCard({ index, passenger, color, onChange, onRemove, canRemove 
           keyboardType="numeric"
           maxLength={11}
         />
-        {passenger.identity_card.length > 0 && passenger.identity_card.length < 11 && (
+        {ciError ? <Text style={pc.errorText}>{ciError}</Text> : null}
+        {passenger.identity_card.length > 0 && passenger.identity_card.length < 11 && !ciError && (
           <Text style={pc.hint}>{11 - passenger.identity_card.length} dígitos restantes</Text>
         )}
       </View>
@@ -239,6 +242,7 @@ const pc = StyleSheet.create({
   label: { fontSize: FONT.sizes.xs, color: COLORS.text.secondary, fontWeight: FONT.weights.semibold },
   input: { backgroundColor: COLORS.bg.input, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border.default, paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm + 2, fontSize: FONT.sizes.md, color: COLORS.text.primary },
   hint: { fontSize: FONT.sizes.xs, color: COLORS.accent.warning },
+  errorText: { fontSize: FONT.sizes.xs, color: COLORS.accent.danger, marginTop: 2 },
 });
 
 
@@ -263,7 +267,7 @@ const sh = StyleSheet.create({
 
 
 export default function AddReservationScreen() {
-  const { id: editId } = useLocalSearchParams<{ id: string }>();
+  const { editId } = useLocalSearchParams<{ editId: string }>();
   const isEditing = !!editId;
   const toast = useGlobalToast();
   const navigation = useNavigation();
@@ -594,28 +598,30 @@ export default function AddReservationScreen() {
           </View>
 
           <View style={s.swapRow}>
-            <View style={s.fieldGroup}>
+            <View style={[s.fieldGroup, { flex: 1 }]}>
               <Text style={s.label}>Origen</Text>
               <TouchableOpacity
-                style={[s.selector, { flex: 1 }, errors.origin ? s.inputError : null]}
+                style={[s.selector, errors.origin ? s.inputError : null]}
                 onPress={() => transport ? setShowOriginModal(true) : Alert.alert('Aviso', 'Selecciona primero el transporte')}
               >
                 <Text style={[s.selText, !origin && s.placeholder]} numberOfLines={1}>{origin || 'Origen'}</Text>
               </TouchableOpacity>
             </View>
 
-            <View style={{ paddingTop: 20 }}>
-              <View style={[s.swapLine, { backgroundColor: COLORS.border.default }]} />
-              <TouchableOpacity style={[s.swapBtn, { borderColor: accentColor, backgroundColor: COLORS.bg.card }]} onPress={swapOriginDestination}>
+            <View style={s.swapBtnContainer}>
+              <TouchableOpacity 
+                style={[s.swapBtn, { borderColor: accentColor, backgroundColor: COLORS.bg.card }]} 
+                onPress={swapOriginDestination}
+                activeOpacity={0.7}
+              >
                 <Ionicons name="swap-horizontal" size={18} color={accentColor} />
               </TouchableOpacity>
-              <View style={[s.swapLine, { backgroundColor: COLORS.border.default }]} />
             </View>
 
-            <View style={s.fieldGroup}>
+            <View style={[s.fieldGroup, { flex: 1 }]}>
               <Text style={s.label}>Destino</Text>
               <TouchableOpacity
-                style={[s.selector, { flex: 1 }, errors.destination ? s.inputError : null]}
+                style={[s.selector, errors.destination ? s.inputError : null]}
                 onPress={() => origin ? setShowDestModal(true) : Alert.alert('Aviso', 'Selecciona primero el origen')}
               >
                 <Text style={[s.selText, !destination && s.placeholder]} numberOfLines={1}>{destination || 'Destino'}</Text>
@@ -676,6 +682,8 @@ export default function AddReservationScreen() {
               canRemove={passengers.length > 1}
               onRemove={() => removePassenger(i)}
               onChange={(f, v) => updatePassenger(i, f, v)}
+              nameError={errors[`p_name_${i}`]}
+              ciError={errors[`p_ci_${i}`]}
             />
           ))}
           <TouchableOpacity style={[s.addPassBtn, { borderColor: accentColor + '55' }]} onPress={addPassenger}>
@@ -983,9 +991,9 @@ const s = StyleSheet.create({
   selector: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, backgroundColor: COLORS.bg.input, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.border.default, paddingHorizontal: SPACING.md, paddingVertical: SPACING.md },
   selText: { flex: 1, fontSize: FONT.sizes.md, color: COLORS.text.primary },
   placeholder: { color: COLORS.text.muted },
-  swapRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
-  swapLine: { flex: 1, height: 1 },
-  swapBtn: { width: 40, height: 40, borderRadius: RADIUS.full, borderWidth: 1.5, justifyContent: 'center', alignItems: 'center' },
+  swapRow: { flexDirection: 'row', alignItems: 'flex-end', gap: SPACING.xs },
+  swapBtnContainer: { height: 52, justifyContent: 'center', alignItems: 'center' },
+  swapBtn: { width: 36, height: 36, borderRadius: RADIUS.full, borderWidth: 1.5, justifyContent: 'center', alignItems: 'center', zIndex: 1 },
   routePriceCard: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, padding: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1 },
   routePriceText: { fontSize: FONT.sizes.sm, fontWeight: FONT.weights.semibold, flex: 1 },
   addPassBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.sm, padding: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1.5, borderStyle: 'dashed' },
@@ -1020,7 +1028,7 @@ const s = StyleSheet.create({
   gestorBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.xs, paddingVertical: SPACING.sm + 2, borderRadius: RADIUS.lg, borderWidth: 1.5, borderColor: COLORS.border.default, backgroundColor: COLORS.bg.input },
   gestorBtnText: { fontSize: FONT.sizes.sm, color: COLORS.text.secondary, fontWeight: FONT.weights.semibold },
   appCostInfo: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, padding: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1 },
-  appCostText: { fontSize: FONT.sizes.sm, fontWeight: FONT.weights.medium, flex: 1 },
+  appCostText: { fontSize: FONT.sizes.sm, fontWeight: FONT.weights.medium, flex: 1, color: '#fff' },
   gananciaPreview: { backgroundColor: COLORS.bg.elevated, borderRadius: RADIUS.lg, padding: SPACING.md, borderWidth: 1, gap: SPACING.sm },
   gananciaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   gananciaLabel: { fontSize: FONT.sizes.sm, color: COLORS.text.secondary },
